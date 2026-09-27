@@ -154,7 +154,7 @@ enum class ElectionCandidate(
             }
 
             mayor.addPerks(perksJson.orEmpty().mapNotNull { it.toPerk() })
-            ElectionApi.repoPerks?.let { mayor.addAdditionalPerks(it) }
+            mayor.addAdditionalPerks(ElectionApi.activeRepoPerks)
             return mayor
         }
     }

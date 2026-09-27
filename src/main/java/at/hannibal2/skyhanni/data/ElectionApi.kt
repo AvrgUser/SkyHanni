@@ -10,6 +10,7 @@ import at.hannibal2.skyhanni.data.jsonobjects.other.MayorCandidate
 import at.hannibal2.skyhanni.data.jsonobjects.other.MayorElection
 import at.hannibal2.skyhanni.data.jsonobjects.other.MayorJson
 import at.hannibal2.skyhanni.data.jsonobjects.repo.ForcedRepoPerksJson
+import at.hannibal2.skyhanni.data.jsonobjects.repo.TimedPerk
 import at.hannibal2.skyhanni.events.ConfigLoadEvent
 import at.hannibal2.skyhanni.events.DebugDataCollectEvent
 import at.hannibal2.skyhanni.events.InventoryFullyOpenedEvent
@@ -322,16 +323,27 @@ object ElectionApi {
         return health
     }
 
-    var repoPerks: List<Perk>? = null
+    private var repoPerks: List<Perk> = emptyList()
+    private var timedRepoPerks: List<TimedPerk> = emptyList()
+    private var lastRepoReloadTime = SimpleTimeMark.farPast()
+
+    val activeRepoPerks: List<Perk> get() = repoPerks + timedRepoPerks.filter { it.isActive }.map { it.perk }
 
     @HandleEvent
     private fun onRepoReload(event: RepositoryReloadEvent) {
         val data = event.getConstant<ForcedRepoPerksJson>("misc/ForcedRepoPerks")
-        repoPerks?.forEach { it.isActive = false }
-        repoPerks = data.perks
-        if (data.perks != null) {
+
+        val previousPerks = repoPerks + timedRepoPerks.filter { it.isActiveAt(lastRepoReloadTime.toMillis()) }.map { it.perk }
+        previousPerks.forEach { it.isActive = false }
+
+        repoPerks = data.perks.orEmpty()
+        timedRepoPerks = data.timedPerks.orEmpty()
+        lastRepoReloadTime = SimpleTimeMark.now()
+
+        val activePerks = activeRepoPerks
+        if (activePerks.isNotEmpty()) {
             val mayor = currentMayor
-            mayor?.addAdditionalPerks(data.perks)
+            mayor?.addAdditionalPerks(activePerks)
             currentMayor = mayor
         }
     }
@@ -343,6 +355,6 @@ object ElectionApi {
     ): List<Perk> = buildList {
         if (includeMayor) addAll(currentMayor?.activePerks.orEmpty())
         if (includeMinister) addAll(currentMinister?.activePerks.orEmpty())
-        if (includeRepoPerk) addAll(repoPerks.orEmpty())
+        if (includeRepoPerk) addAll(activeRepoPerks)
     }
 }
