@@ -40,7 +40,7 @@ class ModuleProcessor(
 
     override fun processSymbols(resolver: Resolver): List<KSAnnotated> {
         skyHanniEvent = resolver.getClassDeclarationByName(
-            "at.hannibal2.skyhanni.api.event.SkyHanniEvent",
+            "tech.thatgravyboat.skyblockapi.api.events.base.SkyBlockEvent",
         )?.asStarProjectedType()
 
         val symbols = processBuildPaths(

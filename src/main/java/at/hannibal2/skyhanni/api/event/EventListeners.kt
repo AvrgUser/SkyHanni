@@ -3,10 +3,11 @@ package at.hannibal2.skyhanni.api.event
 import at.hannibal2.skyhanni.utils.ReflectionUtils
 import at.hannibal2.skyhanni.utils.SkyBlockUtils
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.takeIfNotEmpty
+import tech.thatgravyboat.skyblockapi.api.events.base.SkyBlockEvent
 import java.lang.reflect.Method
 import java.util.function.Consumer
 
-typealias EventPredicate = (event: SkyHanniEvent) -> Boolean
+typealias EventPredicate = (event: SkyBlockEvent) -> Boolean
 
 class EventListeners private constructor(val name: String, private val isGeneric: Boolean) {
 
@@ -88,7 +89,7 @@ class EventListeners private constructor(val name: String, private val isGeneric
 
         private val predicates: List<EventPredicate>
 
-        fun shouldInvoke(event: SkyHanniEvent): Boolean {
+        fun shouldInvoke(event: SkyBlockEvent): Boolean {
             val generation = SkyHanniEvents.getListenerCacheGeneration()
             if (generation != lastCacheGeneration) {
                 cachedPredicateValue = cachedPredicates.all { it(event) }

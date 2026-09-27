@@ -2,16 +2,16 @@ package at.hannibal2.skyhanni.api.event
 
 import at.hannibal2.skyhanni.utils.compat.DrawContextUtils
 import net.minecraft.client.gui.GuiGraphicsExtractor
+import tech.thatgravyboat.skyblockapi.api.events.base.EventBus
+import tech.thatgravyboat.skyblockapi.api.events.base.SkyBlockEvent
 
 /**
  * Use @[HandleEvent]
  */
-abstract class SkyHanniEvent protected constructor() {
-    // TODO: This should only be accessible in the cancellable interface
-    var isCancelled: Boolean = false
-        private set
-
+abstract class SkyHanniEvent protected constructor(): SkyBlockEvent() {
     fun post() = prePost(onError = null)
+
+    override fun post(bus: EventBus): Boolean = post().isCancelled
 
     fun post(onError: (Throwable) -> Unit = {}) = prePost(onError)
 
@@ -21,12 +21,7 @@ abstract class SkyHanniEvent protected constructor() {
         if (this is Rendering) DrawContextUtils.clearContext()
     }
 
-    interface Cancellable {
-        fun cancel() {
-            val event = this as SkyHanniEvent
-            event.isCancelled = true
-        }
-    }
+    typealias Cancellable = SkyBlockEvent.Cancellable
 
     interface Rendering {
         val context: GuiGraphicsExtractor
