@@ -13,18 +13,15 @@ import at.hannibal2.skyhanni.utils.NumberUtil.addSeparators
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.removeIfKey
 import at.hannibal2.skyhanni.utils.system.ModVersion
 import at.hannibal2.skyhanni.utils.system.PlatformUtils
-import tech.thatgravyboat.skyblockapi.api.SkyBlockAPI
-import tech.thatgravyboat.skyblockapi.api.events.base.SkyBlockEvent
 import java.lang.reflect.Method
 import java.util.concurrent.atomic.AtomicInteger
 
 @SkyHanniModule
 object SkyHanniEvents {
-    private val listeners: MutableMap<Class<out SkyBlockEvent>, EventListeners> = mutableMapOf()
-    private val handlers: MutableMap<Class<out SkyBlockEvent>, EventHandler<out SkyBlockEvent>> = mutableMapOf()
+    private val listeners: MutableMap<Class<out SkyHanniEvent>, EventListeners> = mutableMapOf()
+    private val handlers: MutableMap<Class<out SkyHanniEvent>, EventHandler<out SkyHanniEvent>> = mutableMapOf()
     private var disabledHandlers = emptySet<String>()
     private var disabledHandlerInvokers = emptySet<String>()
-    private val proxiedSBAEvents = mutableSetOf<Class<out SkyBlockEvent>>()
 
     fun init(instances: List<Any>) = instances.forEach(::register)
 
@@ -37,7 +34,7 @@ object SkyHanniEvents {
     fun unregister(instance: Any) = instance.javaClass.declaredMethods.forEach(::unregisterMethod)
 
     @Suppress("UNCHECKED_CAST")
-    fun <T : SkyBlockEvent> getEventHandler(event: Class<T>): EventHandler<T> = handlers.getOrPut(event) {
+    fun <T : SkyHanniEvent> getEventHandler(event: Class<T>): EventHandler<T> = handlers.getOrPut(event) {
         EventHandler(
             event,
             getEventClasses(event).mapNotNull { listeners[it] }.flatMap(EventListeners::getListeners),
@@ -52,27 +49,11 @@ object SkyHanniEvents {
         eventTypes.forEach { eventType ->
             listeners.getOrPut(eventType) { EventListeners(eventType) }
                 .addListener(method, instance, options)
-
-            if (!SkyHanniEvent::class.java.isAssignableFrom(eventType)) {
-                if (proxiedSBAEvents.add(eventType)) {
-                    @Suppress("UNCHECKED_CAST")
-                    val sbaClass = eventType as Class<SkyBlockEvent>
-
-                    SkyBlockAPI.eventBus.register(
-                        type = sbaClass,
-                        priority = 0, // SkyHanni handles its own internal priorities
-                        receiveCancelled = true // Let SkyHanni's EventHandler drop cancelled events
-                    ) { sbaEvent ->
-                        getEventHandler(sbaClass).post(sbaEvent)
-                    }
-                }
-            }
-            HandleEvent
         }
     }
 
     @JvmStatic
-    val eventPrimaryFunctionNames: Map<String, Class<out SkyBlockEvent>> =
+    val eventPrimaryFunctionNames: Map<String, Class<out SkyHanniEvent>> =
         GeneratedEventPrimaryFunctionNames.map
 
     private val Method.fullyQualifiedName: String get() = "${declaringClass.name}.$name"
@@ -80,7 +61,7 @@ object SkyHanniEvents {
     private fun handleZeroParameterMethod(
         method: Method,
         options: HandleEvent,
-    ): Pair<HandleEvent, List<Class<out SkyBlockEvent>>>? {
+    ): Pair<HandleEvent, List<Class<out SkyHanniEvent>>>? {
         val primaryFunctionEventType = eventPrimaryFunctionNames[method.name]
         if (primaryFunctionEventType != null) return options to listOf(primaryFunctionEventType)
 
@@ -101,22 +82,22 @@ object SkyHanniEvents {
     private fun handleSingleParameterMethod(
         method: Method,
         options: HandleEvent,
-    ): Pair<HandleEvent, List<Class<out SkyBlockEvent>>>? {
+    ): Pair<HandleEvent, List<Class<out SkyHanniEvent>>>? {
         val eventType = method.parameterTypes.first()
 
-        if (!SkyBlockEvent::class.java.isAssignableFrom(eventType)) {
+        if (!SkyHanniEvent::class.java.isAssignableFrom(eventType)) {
             ErrorManager.crashInDevEnv(
                 "Function ${method.fullyQualifiedName} must have an event assignable from " +
-                    "SkyHanniEvent or SkyBlockEvent because it is annotated with @HandleEvent",
+                    "SkyHanniEvent because it is annotated with @HandleEvent",
             )
             return null
         }
 
         @Suppress("UNCHECKED_CAST")
-        return options to listOf(eventType as Class<out SkyBlockEvent>)
+        return options to listOf(eventType as Class<out SkyHanniEvent>)
     }
 
-    private fun getEventData(method: Method): Pair<HandleEvent, List<Class<out SkyBlockEvent>>>? {
+    private fun getEventData(method: Method): Pair<HandleEvent, List<Class<out SkyHanniEvent>>>? {
         val options = method.getAnnotation(HandleEvent::class.java) ?: return null
         if (!method.declaringClass.isAnnotationPresent(SkyHanniModule::class.java)) {
             ErrorManager.crashInDevEnv(
@@ -148,7 +129,7 @@ object SkyHanniEvents {
         }
     }
 
-    private fun unregisterHandler(clazz: Class<out SkyBlockEvent>) {
+    private fun unregisterHandler(clazz: Class<out SkyHanniEvent>) {
         handlers.removeIfKey { it.isAssignableFrom(clazz) }
     }
 
@@ -284,7 +265,6 @@ object SkyHanniEvents {
         @Suppress("LoopWithTooManyJumpStatements")
         while (current.superclass != null) {
             val superClass = current.superclass
-            if (superClass == SkyBlockEvent::class.java) break
             if (superClass == SkyHanniEvent::class.java) break
             if (superClass == GenericSkyHanniEvent::class.java) break
             if (superClass == RenderingSkyHanniEvent::class.java) break

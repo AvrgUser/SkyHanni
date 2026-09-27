@@ -9,9 +9,8 @@ import at.hannibal2.skyhanni.utils.StringUtils
 import at.hannibal2.skyhanni.utils.compat.componentBuilder
 import at.hannibal2.skyhanni.utils.compat.withColor
 import net.minecraft.ChatFormatting
-import tech.thatgravyboat.skyblockapi.api.events.base.SkyBlockEvent
 
-class EventHandler<T : SkyBlockEvent> private constructor(
+class EventHandler<T : SkyHanniEvent> private constructor(
     val name: String,
     private val listenerCollection: ListenerCollection,
     private val canReceiveCancelled: Boolean,

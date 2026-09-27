@@ -20,7 +20,7 @@ class PrimaryFunctionProcessor(
     private val cache = KspIncrementalCache(cacheDir, mcVersion, "ksp-primary-function-state")
 
     override fun processSymbols(resolver: Resolver): List<KSAnnotated> {
-        val skyHanniEvent = resolver.getClassDeclarationByName("tech.thatgravyboat.skyblockapi.api.events.base.SkyBlockEvent")
+        val skyHanniEvent = resolver.getClassDeclarationByName("at.hannibal2.skyhanni.api.event.SkyHanniEvent")
             ?.asStarProjectedType() ?: return emptyList()
 
         val symbols = resolver.getSymbolsWithAnnotation(PrimaryFunction::class.qualifiedName!!)
