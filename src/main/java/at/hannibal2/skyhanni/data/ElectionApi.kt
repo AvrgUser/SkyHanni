@@ -50,7 +50,7 @@ object ElectionApi {
     private val patternGroup = RepoPattern.group("mayorapi")
 
     /**
-     * REGEX-TEST: Schedules an extra §bFishing Festival §7event during the year.
+     * REGEX-TEST: Schedules an extra Fishing Festival event during the year.
      */
     val foxyExtraEventPattern by patternGroup.pattern(
         "foxy.extraevent.colorless",
