@@ -2,12 +2,11 @@
 
 package at.hannibal2.skyhanni.data
 
-import at.hannibal2.skyhanni.data.ElectionApi.currentMayor
-import at.hannibal2.skyhanni.data.ElectionApi.foxyExtraEventPattern
 import at.hannibal2.skyhanni.data.Perk.Companion.toPerk
 import at.hannibal2.skyhanni.data.jsonobjects.other.MayorPerk
 import at.hannibal2.skyhanni.test.command.ErrorManager
 import at.hannibal2.skyhanni.utils.RegexUtils.matchMatcher
+import at.hannibal2.skyhanni.utils.StringUtils.removeColor
 
 enum class ElectionCandidate(
     val mayorName: String,
@@ -134,7 +133,7 @@ enum class ElectionCandidate(
         return this
     }
 
-    fun isActive() = this == currentMayor
+    fun isActive() = this == ElectionApi.currentMayor
 
     companion object {
 
@@ -259,7 +258,7 @@ enum class Perk(val perkName: String) {
                 "Fishing Festival" to "Extra Event (Fishing)",
             )
 
-            return foxyExtraEventPattern.matchMatcher(this.description) {
+            return ElectionApi.foxyExtraEventPattern.matchMatcher(this.description.removeColor()) {
                 foxyExtraEventPairs.entries.firstOrNull { it.key == group("event") }?.value
             } ?: this.name
         }

@@ -22,7 +22,8 @@ import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
 import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.ConditionalUtils.onToggle
 import at.hannibal2.skyhanni.utils.HypixelCommands
-import at.hannibal2.skyhanni.utils.ItemUtils.getLore
+import at.hannibal2.skyhanni.utils.ItemUtils.cleanName
+import at.hannibal2.skyhanni.utils.ItemUtils.getCleanLore
 import at.hannibal2.skyhanni.utils.RegexUtils.matchMatcher
 import at.hannibal2.skyhanni.utils.RegexUtils.matches
 import at.hannibal2.skyhanni.utils.SafeItemStack
@@ -30,12 +31,10 @@ import at.hannibal2.skyhanni.utils.SimpleTimeMark
 import at.hannibal2.skyhanni.utils.SkyBlockTime
 import at.hannibal2.skyhanni.utils.SkyBlockTime.Companion.SKYBLOCK_YEAR_MILLIS
 import at.hannibal2.skyhanni.utils.SkyBlockUtils
-import at.hannibal2.skyhanni.utils.StringUtils.removeColor
 import at.hannibal2.skyhanni.utils.api.ApiStaticGetPath
 import at.hannibal2.skyhanni.utils.api.ApiUtils
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.nextAfter
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.put
-import at.hannibal2.skyhanni.utils.compat.formattedTextCompatLeadingWhiteLessResets
 import at.hannibal2.skyhanni.utils.json.fromJson
 import at.hannibal2.skyhanni.utils.repopatterns.RepoPattern
 import kotlin.time.Duration.Companion.hours
@@ -53,25 +52,25 @@ object ElectionApi {
      * REGEX-TEST: Schedules an extra §bFishing Festival §7event during the year.
      */
     val foxyExtraEventPattern by patternGroup.pattern(
-        "foxy.extraevent",
-        "Schedules an extra §.(?<event>.*) §.event during the year\\.",
+        "foxy.extraevent.colorless",
+        "Schedules an extra (?<event>.*) event during the year\\.",
     )
 
     /**
      * REGEX-TEST: The election room is now closed. Clerk Seraphine is doing a final count of the votes...
      */
     private val electionOverPattern by patternGroup.pattern(
-        "election.over",
-        "§eThe election room is now closed\\. Clerk Seraphine is doing a final count of the votes\\.\\.\\.",
+        "election.over.colorless",
+        "The election room is now closed\\. Clerk Seraphine is doing a final count of the votes\\.\\.\\.",
     )
 
     /**
-     * REGEX-TEST: §dMayor Jerry
-     * REGEX-TEST: §cMayor Aatrox
+     * REGEX-TEST: Mayor Jerry
+     * REGEX-TEST: Mayor Aatrox
      */
     private val mayorHeadPattern by patternGroup.pattern(
-        "mayor.head",
-        "§.Mayor (?<name>.*)",
+        "mayor.head.colorless",
+        "Mayor (?<name>.*)",
     )
 
     /**
@@ -128,7 +127,7 @@ object ElectionApi {
     fun mayorNameWithColorCode(input: String) = mayorNameToColorCode(input) + input
 
     @HandleEvent
-    fun onSecondPassed(event: SecondPassedEvent) {
+    private fun onSecondPassed(event: SecondPassedEvent) {
         if (!SkyBlockUtils.onHypixel) return
         if (event.repeatSeconds(2)) {
             checkHypixelApi()
@@ -161,8 +160,8 @@ object ElectionApi {
     }
 
     @HandleEvent(onlyOnSkyblock = true)
-    fun onChat(event: SkyHanniChatEvent.Allow) {
-        if (electionOverPattern.matches(event.message)) {
+    private fun onChat(event: SkyHanniChatEvent.Allow) {
+        if (electionOverPattern.matches(event.cleanMessage)) {
             lastMayor = currentMayor
             currentMayor = ElectionCandidate.UNKNOWN
             currentMinister = null
@@ -170,18 +169,18 @@ object ElectionApi {
     }
 
     @HandleEvent(onlyOnSkyblock = true)
-    fun onInventoryFullyOpened(event: InventoryFullyOpenedEvent) {
+    private fun onInventoryFullyOpened(event: InventoryFullyOpenedEvent) {
         if (!CalendarApi.inCalendar) return
 
         val stack: SafeItemStack = event.inventoryItems.values.firstOrNull {
-            mayorHeadPattern.matchMatcher(it.hoverName.formattedTextCompatLeadingWhiteLessResets()) {
+            mayorHeadPattern.matchMatcher(it.cleanName) {
                 group("name") == "Jerry"
             } ?: false
         } ?: return
 
-        val perk = stack.getLore().nextAfter({ perkpocalypsePerksPattern.matches(it) }, 2) ?: return
+        val perk = stack.getCleanLore().nextAfter({ perkpocalypsePerksPattern.matches(it) }, 2) ?: return
         // This is the first Perk of the Perkpocalypse Mayor
-        val jerryMayor = getMayorFromPerk(getPerkFromName(perk.removeColor()) ?: return)?.addAllPerks() ?: return
+        val jerryMayor = getMayorFromPerk(getPerkFromName(perk) ?: return)?.addAllPerks() ?: return
 
         val lastMayorTimestamp = nextMayorTimestamp - SKYBLOCK_YEAR_MILLIS.milliseconds
 
@@ -258,7 +257,7 @@ object ElectionApi {
     private fun shouldAssumeMayor() = assumeMayorConfig.get() != ElectionCandidate.DISABLED
 
     @HandleEvent
-    fun onConfigLoad(event: ConfigLoadEvent) {
+    private fun onConfigLoad(event: ConfigLoadEvent) {
         if (event.firstLoad && config.disableAssumeMayor) {
             assumeMayorConfig.set(ElectionCandidate.DISABLED)
         }
@@ -280,7 +279,7 @@ object ElectionApi {
     }
 
     @HandleEvent
-    fun onDebugDataCollect(event: DebugDataCollectEvent) {
+    private fun onDebugDataCollect(event: DebugDataCollectEvent) {
         event.title("Mayor Election")
 
         val assumeMayor = assumeMayorConfig.get()
@@ -326,7 +325,7 @@ object ElectionApi {
     var repoPerks: List<Perk>? = null
 
     @HandleEvent
-    fun onRepoReload(event: RepositoryReloadEvent) {
+    private fun onRepoReload(event: RepositoryReloadEvent) {
         val data = event.getConstant<ForcedRepoPerksJson>("misc/ForcedRepoPerks")
         repoPerks?.forEach { it.isActive = false }
         repoPerks = data.perks
