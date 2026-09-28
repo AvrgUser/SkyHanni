@@ -1,5 +1,6 @@
 package at.hannibal2.skyhanni.features.garden.visitor
 
+import at.hannibal2.skyhanni.SkyHanniMod.launch
 import at.hannibal2.skyhanni.api.event.HandleEvent
 import at.hannibal2.skyhanni.config.commands.CommandRegistrationEvent
 import at.hannibal2.skyhanni.config.commands.brigadier.BrigadierArguments
@@ -18,17 +19,35 @@ import at.hannibal2.skyhanni.utils.LorenzVec
 import at.hannibal2.skyhanni.utils.SkyBlockUtils
 import at.hannibal2.skyhanni.utils.StringUtils
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.contains
+import at.hannibal2.skyhanni.utils.coroutines.CoroutineSettings
 
 @SkyHanniModule
 object VisitorNavigation {
     private data class VisitorNavigationData(
         val island: IslandType,
-        val position: LorenzVec,
+        val rawPosition: LorenzVec?,
         val name: String,
-    )
+    ) {
+        suspend fun getPosition(): LorenzVec? {
+            if (island == SkyBlockUtils.currentIsland) {
+                val graph = IslandGraphs.currentIslandGraph ?: return rawPosition
+                val nodes = graph.getNodesWithTags(NPC)
+                return nodes.firstOrNull { it.name == name }?.position ?: rawPosition
+            }
+
+            val allPositions = allVisitorPositions ?: run {
+                allVisitorPositions = IslandGraphs.loadAllNpcsLocations { }
+                allVisitorPositions
+            }
+
+            return allPositions?.get(island)?.get(name) ?: rawPosition
+        }
+    }
 
     private var visitors = mapOf<IslandType, List<VisitorNavigationData>>()
-    private var noPositionVisitors = setOf<String>()
+    private var noIslandVisitors = setOf<String>()
+
+    private var allVisitorPositions: Map<IslandType, Map<String, LorenzVec>>? = null
 
     private val currentIslandVisitors get() = visitors[SkyBlockUtils.currentIsland].orEmpty()
 
@@ -36,10 +55,12 @@ object VisitorNavigation {
     private fun onRepoReload(event: RepositoryReloadEvent) {
         val visitors = event.getConstant<GardenJson>("Garden").visitors
         loadVisitors(visitors)
+        allVisitorPositions = null
     }
 
     private fun loadVisitors(visitorsJson: Map<String, GardenVisitor>) {
         val otherVisitors = mutableSetOf<String>()
+
         val visitorsByIsland = visitorsJson.entries
             .groupBy { it.value.mode }
             .mapNotNull { (mode, visitors) ->
@@ -56,9 +77,10 @@ object VisitorNavigation {
                     otherVisitors += name
                     return@mapNotNull null
                 }
+
                 VisitorNavigationData(
                     island = island,
-                    position = position,
+                    rawPosition = position,
                     name = name,
                 )
             }
@@ -66,7 +88,7 @@ object VisitorNavigation {
             island to navigationData
         }
 
-        noPositionVisitors = otherVisitors
+        noIslandVisitors = otherVisitors
     }
 
     @HandleEvent
@@ -111,36 +133,52 @@ object VisitorNavigation {
             .values
             .flatten()
             .map { it.name }
-        return (currentIsland + otherIslands + noPositionVisitors).toList()
+        return (currentIsland + otherIslands + noIslandVisitors).toList()
     }
 
-    private fun visitorNotFound(rawName: String) {
+    private fun noPositionFound(visitor: VisitorNavigationData) {
+        ChatUtils.userError(
+            "Visitor §a'${visitor.name}' §ccould not be located."
+        )
+        WikiManager.sendWikiMessage(visitor.name, autoOpen = false)
+    }
+
+    private suspend fun visitorNotFound(rawName: String) {
         val visitor = visitors.values
             .flatten()
             .firstOrNull { it.name.equals(rawName, ignoreCase = true) }
 
         if (visitor == null) {
-            if (!noPositionVisitors.contains(rawName, ignoreCase = true)) {
+            if (!noIslandVisitors.contains(rawName, ignoreCase = true)) {
                 ChatUtils.userError("Visitor §a'$rawName' §ccould not be found.")
                 return
             }
+
             ChatUtils.userError(
-                "Visitor §a'$rawName' §cdoes not have a fixed location. " +
+                "Visitor §a'$rawName' §cdoes not have a fixed position. " +
                     "Some visitors only appear under specific conditions."
             )
             WikiManager.sendWikiMessage(rawName, autoOpen = false)
             return
         }
 
+        val position = visitor.getPosition() ?: run {
+            noPositionFound(visitor)
+            return
+        }
+
         ChatUtils.chat(
             "§7Visitor §a'${visitor.name}' §7is at §a${visitor.island.displayName}§7."
         )
+
         WarpApi.sendWarpMessage(
-            position = visitor.position,
+            position = position,
             island = visitor.island,
             shouldRetry = true,
             onWarp = {
-                startNavigation(visitor)
+                CoroutineSettings("visitor navigation after warp").launch {
+                    startNavigation(visitor)
+                }
             },
             onFail = {
                 ChatUtils.chat(
@@ -155,11 +193,9 @@ object VisitorNavigation {
 
         val npcNodes = graph.getNodesWithTags(NPC)
 
-        val nodes = currentIslandVisitors.map { visitor ->
-            val position = visitor.position
-            npcNodes.filter { it.name == visitor.name }
-                .minByOrNull { it.position.distanceSq(position) }
-                ?: graph.getNearestNode(position)
+        val nodes = currentIslandVisitors.mapNotNull { visitor ->
+            npcNodes.firstOrNull { it.name == visitor.name }
+                ?: visitor.rawPosition?.let { graph.getNearestNode(it) }
         }
 
         NavigateAllApi.navigateAll(
@@ -176,9 +212,14 @@ object VisitorNavigation {
         )
     }
 
-    private fun startNavigation(visitor: VisitorNavigationData) {
+    private suspend fun startNavigation(visitor: VisitorNavigationData) {
+        val position = visitor.getPosition() ?: run {
+            noPositionFound(visitor)
+            return
+        }
+
         IslandGraphs.pathFind(
-            location = visitor.position,
+            location = position,
             label = visitor.name,
             color = LorenzColor.DARK_PURPLE.toColor(),
             condition = { true },

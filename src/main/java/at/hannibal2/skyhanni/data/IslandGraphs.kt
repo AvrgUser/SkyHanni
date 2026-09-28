@@ -676,4 +676,74 @@ object IslandGraphs {
             extraData = data.map { it.key to it.value }.normalizeAsArray(),
         )
     }
+
+    suspend fun loadAllNpcsLocations(
+        log: (String) -> Unit,
+    ): Map<IslandType, Map<String, LorenzVec>>? {
+        val npcs = collectFromIslandGraphs(
+            log = log,
+            shouldLoadIsland = { it !in IslandTypeTag.NO_FIXED_NPC_LOCATIONS },
+            transform = { node ->
+                if (!node.hasTag(GraphNodeTag.NPC)) return@collectFromIslandGraphs null
+
+                val name = node.name
+                    ?: error("name is null for npc node at ${node.position}")
+
+                name to node.position
+            },
+        ).mapValues { (_, npcs) ->
+            npcs.toMap()
+        }
+
+        val total = npcs.values.sumOf { it.size }
+        log("found in total $total npcs in sh repo")
+
+        if (total == 0) {
+            log("no sh npcs loaded via local repo data!")
+            return null
+        }
+
+        return npcs
+    }
+
+    suspend fun <T> collectFromIslandGraphs(
+        log: (String) -> Unit = {},
+        shouldLoadIsland: (IslandType) -> Boolean = { true },
+        transform: (GraphNode) -> T?,
+    ): Map<IslandType, List<T>> {
+        val result = mutableMapOf<IslandType, MutableList<T>>()
+
+        val graphs = buildList {
+            for (islandType in IslandType.entries) {
+                if (shouldLoadIsland(islandType)) {
+                    add(islandType.name to islandType)
+                }
+            }
+
+            if (shouldLoadIsland(DWARVEN_MINES)) {
+                add("GLACITE_TUNNELS" to DWARVEN_MINES)
+            }
+        }
+
+        for ((graphName, islandType) in graphs) {
+            val graph = runCatching {
+                SkyHanniRepoManager.getRepoDataAsync<Graph>(
+                    "constants/island_graphs",
+                    graphName,
+                    gson = Graph.gson,
+                )
+            }.getOrElse {
+                log("failed to load island graph for island $graphName")
+                continue
+            }
+
+            val values = graph.mapNotNull(transform)
+
+            if (values.isNotEmpty()) {
+                result.getOrPut(islandType) { mutableListOf() }.addAll(values)
+            }
+        }
+
+        return result
+    }
 }

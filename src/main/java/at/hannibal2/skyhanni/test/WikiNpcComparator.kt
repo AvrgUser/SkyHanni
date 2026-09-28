@@ -4,11 +4,8 @@ import at.hannibal2.skyhanni.SkyHanniMod.launchCoroutine
 import at.hannibal2.skyhanni.api.event.HandleEvent
 import at.hannibal2.skyhanni.config.commands.CommandCategory
 import at.hannibal2.skyhanni.config.commands.CommandRegistrationEvent
+import at.hannibal2.skyhanni.data.IslandGraphs
 import at.hannibal2.skyhanni.data.IslandType
-import at.hannibal2.skyhanni.data.IslandTypeTag
-import at.hannibal2.skyhanni.data.model.graph.Graph
-import at.hannibal2.skyhanni.data.model.graph.GraphNodeTag
-import at.hannibal2.skyhanni.data.repo.SkyHanniRepoManager
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
 import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.LorenzVec
@@ -21,7 +18,7 @@ import at.hannibal2.skyhanni.utils.coroutines.CoroutineSettings
 object WikiNpcComparator {
 
     @HandleEvent
-    fun onCommandRegistration(event: CommandRegistrationEvent) {
+    private fun onCommandRegistration(event: CommandRegistrationEvent) {
         event.registerBrigadier("shcomparewikinpc") {
             description = "Compare NPC locations from wiki (clipboard) with SkyHanni graph data."
             category = CommandCategory.DEVELOPER_TEST
@@ -29,7 +26,8 @@ object WikiNpcComparator {
                 CoroutineSettings("compare wiki npc data").launchCoroutine {
                     val result = mutableListOf<String>()
                     val wikiNpcs = customRules(loadWiki(result)) ?: return@launchCoroutine
-                    val shNpcs = loadShNpcs(result) ?: return@launchCoroutine
+                    // TODO do this once on skyblock join, then store until repo reload.
+                    val shNpcs = IslandGraphs.loadAllNpcsLocations(result::add) ?: return@launchCoroutine
                     compare(result, shNpcs, wikiNpcs)
                 }
             }
@@ -70,48 +68,6 @@ object WikiNpcComparator {
             return null
         }
         return wikiNpcs
-    }
-
-    // TODO do this once on skyblock join, then store until repo reload.
-    private suspend fun loadShNpcs(result: MutableList<String>): MutableMap<IslandType, MutableMap<String, LorenzVec>>? {
-        val shNpcs = mutableMapOf<IslandType, MutableMap<String, LorenzVec>>()
-
-        val islands = mutableMapOf<String, IslandType>()
-        for (islandType in IslandType.entries) {
-            if (islandType in IslandTypeTag.NO_FIXED_NPC_LOCATIONS) continue
-            islands[islandType.name] = islandType
-        }
-        islands["GLACITE_TUNNELS"] = IslandType.DWARVEN_MINES
-
-        for ((name, type) in islands) {
-            val graph = runCatching {
-                SkyHanniRepoManager.getRepoDataAsync<Graph>(
-                    "constants/island_graphs", name, gson = Graph.gson,
-                )
-            }.getOrElse {
-                result.add("failed to load island graph for island $name")
-                continue
-            }
-
-            val npcs = mutableMapOf<String, LorenzVec>()
-            for (node in graph) {
-                if (node.hasTag(GraphNodeTag.NPC)) {
-                    val name = node.name ?: error("name is null for npc node at ${node.position} in island $name")
-                    npcs[name] = node.position
-                }
-            }
-            if (npcs.isNotEmpty()) {
-                shNpcs.getOrPut(type) { mutableMapOf() }.putAll(npcs)
-            }
-        }
-
-        val total = shNpcs.values.sumOf { it.size }
-        result.add("found in total $total npcs in sh repo")
-        if (total == 0) {
-            ChatUtils.chat("no sh npcs loaded via local repo data!")
-            return null
-        }
-        return shNpcs
     }
 
     private fun compare(
