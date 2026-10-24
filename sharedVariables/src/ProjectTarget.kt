@@ -46,7 +46,18 @@ enum class ProjectTarget(
         renderChestVersion = "2.0.0-beta.1+26.3",
         modrinthInfo = ModrinthInfo.FABRIC_26_3,
     ),
-
+    MODERN_26400(
+        "26.4",
+        MinecraftVersion.MC26400,
+        fabricLoaderVersion = "net.fabricmc:fabric-loader:0.19.3",
+        fabricApiVersion = "net.fabricmc.fabric-api:fabric-api:0.164.1+26.4",
+        hypixelModApiVersion = "net.hypixel:mod-api:1.0.2",
+        // There is no 26.4 version; the 26.1 version works on 26.4.
+        hypixelModApiFabricVersion = "maven.modrinth:hypixel-mod-api:1.0.2+build.1+mc26.1",
+        modMenuVersion = "21.0.0-alpha.1",
+        renderChestVersion = "2.0.0-beta.1+26.4",
+        modrinthInfo = ModrinthInfo.FABRIC_26_4,
+    )
     ;
 
     val projectPath get() = ":$projectName"

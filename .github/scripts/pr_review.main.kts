@@ -992,6 +992,7 @@ fun runBuildMode(prNumber: String) {
     val log1 = readBuildLog(System.getenv("ARTIFACT_DIR_1"))
     val log2 = readBuildLog(System.getenv("ARTIFACT_DIR_2"))
     val log3 = readBuildLog(System.getenv("ARTIFACT_DIR_3"))
+    val log4 = readBuildLog(System.getenv("ARTIFACT_DIR_4"))
 
     buildComment.staleExisting(prNumber)
 
@@ -1013,7 +1014,13 @@ fun runBuildMode(prNumber: String) {
         exitProcess(0)
     }
 
-    val versions = filterStonecutterDuplicates(listOf("26.1" to log1, "26.2" to log2, "26.3" to log3))
+    val versions = filterStonecutterDuplicates(
+        listOf("26.1" to log1,
+            "26.2" to log2,
+            "26.3" to log3,
+            "26.4" to log4,
+        )
+    )
     buildComment.post(prNumber, buildBuildFailureBody(versions)) {
         "Error: could not post build failure comment (HTTP $it)"
     }

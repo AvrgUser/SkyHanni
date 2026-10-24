@@ -32,6 +32,15 @@ enum class ModrinthInfo(
             ModrinthDependency.HYPIXEL_MOD_API to DependencyType.REQUIRED,
         ),
     ),
+    FABRIC_26_4(
+        minecraftVersions = listOf("26.4-snapshot-5", "26.4"),
+        loader = "fabric",
+        dependencies = mapOf(
+            ModrinthDependency.FABRIC_API to DependencyType.REQUIRED,
+            ModrinthDependency.FABRIC_LANGUAGE_KOTLIN to DependencyType.REQUIRED,
+            ModrinthDependency.HYPIXEL_MOD_API to DependencyType.REQUIRED,
+        ),
+    ),
 }
 
 enum class ModrinthDependency(

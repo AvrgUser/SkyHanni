@@ -165,6 +165,7 @@ dependencies {
     "productionRuntimeMods"(target.hypixelModApiFabricVersion)
 
     val reiVersion = when (target) {
+        ProjectTarget.MODERN_26400 -> null
         ProjectTarget.MODERN_26300 -> null
         ProjectTarget.MODERN_26200 -> "26.2.820"
         ProjectTarget.MODERN_26100 -> "26.1.819"

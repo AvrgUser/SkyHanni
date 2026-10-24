@@ -120,7 +120,7 @@ allprojects {
     }
 }
 
-stonecutter active "26.3"
+stonecutter active "26.4"
 
 stonecutter parameters {
     constants {
