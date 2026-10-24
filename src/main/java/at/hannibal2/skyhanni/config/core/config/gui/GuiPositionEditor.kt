@@ -70,11 +70,11 @@ class GuiPositionEditor(
         OtherInventoryData.close()
     }
 
-    override fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
+    override fun onDrawScreen() {
         width = getEditorScaledWidth()
         height = getEditorScaledHeight()
-        drawDefaultBackground(mouseX, mouseY, partialTicks)
-        oldScreenRenderContext.render(mouseX, mouseY, partialTicks)
+        drawDefaultBackground()
+        oldScreenRenderContext.render()
 
         val hoveredPos = renderRectangles()
 
@@ -308,12 +308,15 @@ private class OldScreenRenderContext(
     private val getEditorScaledHeight: () -> Int,
 ) {
 
-    fun render(mouseX: Int, mouseY: Int, partialTicks: Float) {
+    fun render() {
         val oldScreen = oldScreen ?: return
         val scaleX = oldScreenScaleX(oldScreen)
         val scaleY = oldScreenScaleY(oldScreen)
+        //? if < 26.4 {
+        /*val (mouseX, mouseY) = GuiScreenUtils.mousePos
         val oldScreenMouseX = (mouseX / scaleX).toInt()
         val oldScreenMouseY = (mouseY / scaleY).toInt()
+        *///?}
 
         DrawContextUtils.pushPop {
             DrawContextUtils.scale(scaleX, scaleY)

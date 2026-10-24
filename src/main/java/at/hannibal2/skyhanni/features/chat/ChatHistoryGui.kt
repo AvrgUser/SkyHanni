@@ -9,6 +9,7 @@ import at.hannibal2.skyhanni.utils.KeyboardManager.isKeyHeld
 import at.hannibal2.skyhanni.utils.OSUtils
 import at.hannibal2.skyhanni.utils.StringUtils.stripHypixelMessage
 import at.hannibal2.skyhanni.utils.compat.DrawContextUtils
+import at.hannibal2.skyhanni.utils.compat.GuiScreenUtils
 import at.hannibal2.skyhanni.utils.compat.MouseCompat
 import at.hannibal2.skyhanni.utils.compat.SkyHanniBaseScreen
 import at.hannibal2.skyhanni.utils.compat.convertToJsonString
@@ -38,8 +39,9 @@ class ChatHistoryGui(private val history: List<ChatManager.MessageFilteringResul
         history.sumOf { splitLine(it.message).size * 10 + (it.modified?.let { mod -> splitLine(mod).size * 10 } ?: 0) }
 
     // TODO use Renderables instead
-    override fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
-        drawDefaultBackground(mouseX, mouseY, partialTicks)
+    override fun onDrawScreen() {
+        val (mouseX, mouseY) = GuiScreenUtils.mousePos
+        drawDefaultBackground()
         var queuedTooltip: List<String>? = null
         val l = (width / 2.0 - w / 2.0).toInt()
         val t = (height / 2.0 - h / 2.0).toInt()

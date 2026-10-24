@@ -16,12 +16,23 @@ abstract class SkyHanniBaseScreen(title: Component = Component.empty()) : Screen
 
     val mc: Minecraft = Minecraft.getInstance()
 
-    override fun extractRenderState(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
+    //? if < 26.4 {
+    /*override fun extractRenderState(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
         super.extractRenderState(context, mouseX, mouseY, delta)
-        postDrawScreen(context, mouseX, mouseY, delta)
+    *///?} else {
+    override fun extractRenderState(context: GuiGraphicsExtractor) {
+        super.extractRenderState(context)
+    //?}
+        postDrawScreen(context)
     }
 
-    override fun extractBackground(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, deltaTicks: Float) {
+    //? if < 26.4 {
+    /*override fun extractBackground(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
+        super.extractBackground(context, mouseX, mouseY, delta)
+    *///?} else {
+    override fun extractBackground(context: GuiGraphicsExtractor) {
+        super.extractBackground(context)
+    //?}
         try {
             this.extractMenuBackground(context)
         } catch (e: Exception) {
@@ -29,17 +40,17 @@ abstract class SkyHanniBaseScreen(title: Component = Component.empty()) : Screen
         }
     }
 
-    private fun postDrawScreen(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTicks: Float) {
+    private fun postDrawScreen(context: GuiGraphicsExtractor) {
         DrawContextUtils.setContext(context)
         try {
-            onDrawScreen(mouseX, mouseY, partialTicks)
+            onDrawScreen()
         } catch (e: Exception) {
             ErrorManager.logErrorWithData(e, "Error while drawing screen", "screen" to this)
         }
         DrawContextUtils.clearContext()
     }
 
-    open fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {}
+    open fun onDrawScreen() {}
 
     override fun mouseClicked(click: MouseButtonEvent, doubled: Boolean): Boolean {
         postMouseClicked(click.x.toInt(), click.y.toInt(), click.button())
@@ -162,7 +173,7 @@ abstract class SkyHanniBaseScreen(title: Component = Component.empty()) : Screen
 
     open fun onInitGui() {}
 
-    fun drawDefaultBackground(mouseX: Int, mouseY: Int, partialTicks: Float) {
+    fun drawDefaultBackground() {
         extractMenuBackground(DrawContextUtils.drawContext)
     }
 

@@ -227,6 +227,7 @@ enum class OreBlock(
         )
 
         private fun BlockState.isGemstoneWithColor(color: DyeColor): Boolean = when (block) {
+            //~ if < 26.4 '`color`' -> 'color'
             is StainedGlassBlock -> (block as StainedGlassBlock).`color` == color
             is StainedGlassPaneBlock -> (block as StainedGlassPaneBlock).`color` == color
             //~}
