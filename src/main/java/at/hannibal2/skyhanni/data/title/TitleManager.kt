@@ -130,6 +130,8 @@ object TitleManager {
         val weightOverride = if (addType == TitleAddType.FORCE_FIRST) Double.MAX_VALUE else newTitle.weight
         targetQueue.add(newTitle, weightOverride)
 
+        // Instantly evaluate to ensure a newly added title can claim its spot if current slot is empty or lower weight
+        updateLocationState(location)
         return newTitle
     }
 
@@ -179,6 +181,7 @@ object TitleManager {
         for (context in currentTitles.values) {
             context?.stop()
         }
+        currentTitles.clear()
         ChatUtils.chat("Reset all active titles!")
     }
 
@@ -233,7 +236,7 @@ object TitleManager {
             if (titleContext == null || !titleContext.discardOnWorldChange) return@forEach
             titleContext.stop()
             currentTitles[location] = null
-            dequeueNextTitle(location)
+            updateLocationState(location)
         }
     }
 
@@ -249,61 +252,78 @@ object TitleManager {
 
     private fun stop(location: TitleLocation? = null) {
         when (location) {
-            null -> currentTitles.values.filterNotNull().forEach { it.stop() }
-            else -> currentTitles[location]?.stop()
-        }
-    }
-
-    @HandleEvent
-    private fun onTick() {
-        TitleLocation.entries.filter {
-            it.activationRequirement.invoke()
-        }.forEach { location ->
-            when (val currentTitle = currentTitles[location]) {
-                null -> dequeueNextTitle(location)
-                else -> {
-                    val titleLocationQueue = titleLocationQueues[location]
-                    titleLocationQueue?.getWaitingWeightOrNull()?.let { waitingWeight ->
-                        if (waitingWeight < currentTitle.weight) return@let
-                        if (!currentTitle.alive) return@let
-                        if (!currentTitle.processRequeue()) return@let
-                        titleLocationQueue.add(currentTitle, currentTitle.weight)
-                        dequeueNextTitle(location)
-                        return@forEach
-                    }
-                    if (currentTitle.alive) return@forEach
-                    currentTitle.stop()
-                    dequeueNextTitle(location)
-                }
+            null -> {
+                currentTitles.values.filterNotNull().forEach { it.stop() }
+                currentTitles.clear()
             }
-        }
-        // Watchdog
-        TitleLocation.entries.forEach {
-            currentTitles[it]?.start()
-            if (currentTitles[it]?.alive == false) {
-                currentTitles[it]?.stop()
-                currentTitles[it] = null
+            else -> {
+                currentTitles[location]?.stop()
+                currentTitles[location] = null
             }
         }
     }
 
-    private fun dequeueNextTitle(location: TitleLocation) {
+    /**
+     * Lazily and reactively updates the state (expiration, queue preemption, and polling)
+     * for a location right when it's accessed or rendered, removing the need for a ticker.
+     */
+    private fun getActiveTitle(location: TitleLocation): TitleContext? {
+        if (!location.activationRequirement()) return null
+
+        val currentTitle = currentTitles[location]
         val titleQueue = titleLocationQueues[location]
-        val title = titleQueue?.pollOrNull()
-        currentTitles[location] = title
+
+        // 1. Check if current title expired or needs to be stopped
+        if (currentTitle != null && !currentTitle.alive) {
+            currentTitle.stop()
+            currentTitles[location] = null
+        }
+
+        // 2. Check if a waiting item has higher/equal weight to preempt current title (requeue logic)
+        val waitingWeight = titleQueue?.getWaitingWeightOrNull()
+        val activeCurrent = currentTitles[location]
+
+        if (waitingWeight != null && activeCurrent != null && activeCurrent.alive) {
+            if (waitingWeight >= activeCurrent.weight && activeCurrent.processRequeue()) {
+                titleQueue.add(activeCurrent, activeCurrent.weight)
+                currentTitles[location] = null
+            }
+        }
+
+        // 3. Pull next title if slot is empty
+        if (currentTitles[location] == null) {
+            val nextTitle = titleQueue?.pollOrNull()
+            if (nextTitle != null) {
+                nextTitle.start()
+                currentTitles[location] = nextTitle
+            }
+        }
+
+        val resolved = currentTitles[location]
+        if (resolved != null && !resolved.alive) {
+            resolved.stop()
+            currentTitles[location] = null
+            return getActiveTitle(location) // Recurse to pull subsequent if needed
+        }
+
+        return resolved
+    }
+
+    private fun updateLocationState(location: TitleLocation) {
+        getActiveTitle(location)
     }
 
     @HandleEvent
     private fun onGuiRenderOverlay() {
         if (InventoryUtils.inInventory()) return
-        val globalTitle = currentTitles[TitleLocation.GLOBAL] ?: return
+        val globalTitle = getActiveTitle(TitleLocation.GLOBAL) ?: return
         globalTitle.tryRenderGlobalTitle()
     }
 
     @HandleEvent
     private fun onChestGuiRender() {
         if (!InventoryUtils.inInventory()) return
-        val inventoryTitle = currentTitles[TitleLocation.INVENTORY] ?: return
+        val inventoryTitle = getActiveTitle(TitleLocation.INVENTORY) ?: return
         inventoryTitle.tryRenderInventoryTitle()
     }
 }
