@@ -59,7 +59,7 @@ enum class ProjectTarget(
         // There is no 26.4 version; the 26.1 version works on 26.4.
         hypixelModApiFabricVersion = "maven.modrinth:hypixel-mod-api:1.0.2+build.1+mc26.1",
         modMenuVersion = "21.0.0-alpha.1",
-        renderChestVersion = "2.0.0-beta.1+26.4",
+        renderChestVersion = null,
         reiVersion = null,
         modrinthInfo = ModrinthInfo.FABRIC_26_4,
     )
