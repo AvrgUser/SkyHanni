@@ -6,6 +6,7 @@ import at.hannibal2.skyhanni.utils.KeyboardManager
 import at.hannibal2.skyhanni.utils.KeyboardManager.isKeyHeld
 import at.hannibal2.skyhanni.utils.StringUtils.splitLines
 import at.hannibal2.skyhanni.utils.compat.DrawContextUtils
+import at.hannibal2.skyhanni.utils.compat.GuiScreenUtils
 import at.hannibal2.skyhanni.utils.compat.MinecraftCompat
 import at.hannibal2.skyhanni.utils.compat.MouseCompat
 import at.hannibal2.skyhanni.utils.compat.SkyHanniBaseScreen
@@ -46,8 +47,9 @@ class DefaultConfigOptionGui(
         orderedOptions.keys.associateWith { ResetSuggestionState.LEAVE_DEFAULTS }.toMutableMap()
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
-    override fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
-        drawDefaultBackground(mouseX, mouseY, partialTicks)
+    override fun onDrawScreen() {
+        val (mouseX, mouseY) = GuiScreenUtils.mousePos
+        drawDefaultBackground()
         GuiRenderUtils.drawFloatingRectDark((width - xSize) / 2, (height - ySize) / 2, xSize, ySize)
         var hoveringTextToDraw: List<String>? = null
         val x = mouseX - ((width - xSize) / 2) - padding

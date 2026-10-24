@@ -9,6 +9,7 @@ import at.hannibal2.skyhanni.utils.RenderUtils
 import at.hannibal2.skyhanni.utils.SimpleTimeMark
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.containsKeys
 import at.hannibal2.skyhanni.utils.compat.DrawContextUtils
+import at.hannibal2.skyhanni.utils.compat.GuiScreenUtils
 import at.hannibal2.skyhanni.utils.compat.SkyHanniBaseScreen
 import at.hannibal2.skyhanni.utils.renderables.Renderable
 import at.hannibal2.skyhanni.utils.renderables.RenderableUtils.renderXAligned
@@ -59,14 +60,15 @@ class ChangeLogViewerScreen : SkyHanniBaseScreen() {
         }
     }
 
-    override fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
+    override fun onDrawScreen() {
         ChangelogViewer.openTime = SimpleTimeMark.now()
         val width = 4 * this.width / 5
         val height = 4 * this.height / 5
         val xTranslate = this.width / 10
         val yTranslate = this.height / 10
 
-        drawDefaultBackground(mouseX, mouseY, partialTicks)
+        val (mouseX, mouseY) = GuiScreenUtils.mousePos
+        drawDefaultBackground()
         DrawContextUtils.translate(xTranslate - 2.0, yTranslate - 2.0)
         GuiRenderUtils.drawFloatingRectDark(0, 0, width, height)
         DrawContextUtils.translate(-(xTranslate - 2.0), -(yTranslate - 2.0))

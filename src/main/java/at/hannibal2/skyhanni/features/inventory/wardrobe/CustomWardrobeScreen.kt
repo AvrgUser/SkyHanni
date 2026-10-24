@@ -32,7 +32,7 @@ class CustomWardrobeScreen(
         // slotChanged is called when a screen is opened, so no need to call CustomWardrobe.onInventoryUpdate() here
     }
 
-    override fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
+    override fun onDrawScreen() {
         CustomWardrobe.renderWardrobeOverlay(this.width, this.height)
     }
 

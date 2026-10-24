@@ -7,6 +7,7 @@ import at.hannibal2.skyhanni.mixins.hooks.VisualWordsHook
 import at.hannibal2.skyhanni.utils.InputKeys
 import at.hannibal2.skyhanni.utils.KeyboardManager
 import at.hannibal2.skyhanni.utils.compat.DrawContextUtils
+import at.hannibal2.skyhanni.utils.compat.GuiScreenUtils
 import at.hannibal2.skyhanni.utils.compat.SkyHanniBaseScreen
 import at.hannibal2.skyhanni.utils.renderables.Renderable
 import at.hannibal2.skyhanni.utils.renderables.ScrollValue
@@ -40,8 +41,9 @@ class VisualWordScreen : SkyHanniBaseScreen() {
     }
 
     override fun onInitGui() = rebuildDisplay()
-    override fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
-        drawDefaultBackground(mouseX, mouseY, partialTicks)
+    override fun onDrawScreen() {
+        val (mouseX, mouseY) = GuiScreenUtils.mousePos
+        drawDefaultBackground()
         val renderable = display ?: return
         val startX = (width - renderable.width) / 2
         val startY = (height - renderable.height) / 2

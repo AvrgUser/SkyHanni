@@ -99,8 +99,8 @@ object InputSequenceTracker {
 
         private val openedAt = SimpleTimeMark.now()
 
-        override fun onDrawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
-            drawDefaultBackground(mouseX, mouseY, partialTicks)
+        override fun onDrawScreen() {
+            drawDefaultBackground()
 
             box(0, 18, 44, 25, BASE_COLOR)
             box(0, 8, 44, 18, BODY_COLOR)
