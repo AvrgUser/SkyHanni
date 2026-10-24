@@ -5,21 +5,16 @@ import at.hannibal2.skyhanni.api.event.HandleEvent
 import at.hannibal2.skyhanni.config.commands.CommandCategory
 import at.hannibal2.skyhanni.config.commands.CommandRegistrationEvent
 import at.hannibal2.skyhanni.config.commands.brigadier.BrigadierArguments
-import at.hannibal2.skyhanni.config.core.config.Position
-import at.hannibal2.skyhanni.data.title.CountdownTitleContext.Companion.fromTitleData
 import at.hannibal2.skyhanni.events.DebugDataCollectEvent
-import at.hannibal2.skyhanni.events.GuiRenderEvent
-import at.hannibal2.skyhanni.events.minecraft.SkyHanniTickEvent
-import at.hannibal2.skyhanni.events.minecraft.WorldChangeEvent
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
-import at.hannibal2.skyhanni.test.command.ErrorManager
 import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.InventoryUtils
 import at.hannibal2.skyhanni.utils.TimeUtils
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.enumMapOf
+import at.hannibal2.skyhanni.utils.renderables.Renderable
+import at.hannibal2.skyhanni.utils.renderables.primitives.text
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 @SkyHanniModule
@@ -28,52 +23,7 @@ object TitleManager {
     private val titleLocationQueues: MutableMap<TitleLocation, CollectionUtils.OrderedQueue<TitleContext>> = enumMapOf()
     private val currentTitles: MutableMap<TitleLocation, TitleContext?> = enumMapOf()
     val guiConfig get() = SkyHanniMod.feature.gui
-    val existingIntentions = guiConfig.titleIntentionPositions.values.flatMap { it.keys }.toSet()
     val intentionMapper: MutableMap<String, TitleIntention> = mutableMapOf()
-
-    inline fun<reified E : Enum<E>> registerIntentions(
-        invokerClazz: Class<Any>,
-        defaultPosition: Position? = null,
-    ) {
-        val enumClass = E::class.java
-        val enumConstants = enumClass.enumConstants
-
-        for (enumConstant in enumConstants) {
-            val name = enumConstant.name
-            val reifiedName = "${invokerClazz.simpleName}.${enumClass.simpleName}.$name"
-            val intentionContext = TitleIntention(
-                displayName = enumConstant.toString(),
-                internalName = reifiedName,
-            )
-
-            if (existingIntentions.contains(reifiedName)) {
-                intentionMapper[name] = intentionContext
-                continue
-            }
-
-            val collisionItem = existingIntentions.firstOrNull { it != reifiedName && it.endsWith(".$name") }
-            if (collisionItem != null) ErrorManager.skyHanniError(
-                "Unique title intention violation - ${invokerClazz.simpleName} " +
-                    "attempted to register $name, but $collisionItem already exists."
-            )
-
-            intentionMapper[name] = intentionContext
-            val position = defaultPosition ?: guiConfig.titlePosition
-            TitleLocation.entries.forEach { locationType ->
-                val intentionPosition = guiConfig.titleIntentionPositions.getOrPut(locationType) { mutableMapOf() }
-                intentionPosition[reifiedName] = position
-                guiConfig.titleIntentionPositions[locationType] = intentionPosition
-            }
-        }
-    }
-
-    enum class CountdownTitleDisplayType(private val displayName: String) {
-        WHOLE_SECONDS("Whole Seconds"),
-        PARTIAL_SECONDS("Partial Seconds"),
-        ;
-
-        override fun toString() = displayName
-    }
 
     enum class TitleLocation(
         private val displayName: String,
@@ -94,8 +44,53 @@ object TitleManager {
         override fun toString() = displayName
     }
 
+    private fun <E : Enum<E>> parseIntention(intention: E?): TitleIntention? = when (intention) {
+        null -> null
+        else -> intentionMapper[intention.name]
+    }
+
     /**
-     * always combine this with notifyOrDisable!
+     * Send a title using a pre-built Renderable component.
+     */
+    fun <E : Enum<E>> sendTitle(
+        title: Renderable,
+        subtitle: Renderable? = null,
+        duration: Duration = 5.seconds,
+        intention: E? = null,
+        location: TitleLocation = TitleLocation.GLOBAL,
+        addType: TitleAddType = TitleAddType.QUEUE,
+        weight: Double = 1.0,
+        discardOnWorldChange: Boolean = true,
+        noDuplicates: Boolean = true,
+    ): TitleContext? = sendTitleInternal(
+        TitleContext(title, subtitle, parseIntention(intention), duration, weight, discardOnWorldChange),
+        location,
+        addType,
+        noDuplicates
+    )
+
+    /**
+     * Send a dynamic/reactive title using suppliers (() -> Renderable) for live updates (e.g., timers & countdowns).
+     */
+    fun <E : Enum<E>> sendTitle(
+        titleSupplier: () -> Renderable,
+        subtitleSupplier: (() -> Renderable)? = null,
+        duration: Duration = 5.seconds,
+        intention: E? = null,
+        location: TitleLocation = TitleLocation.GLOBAL,
+        addType: TitleAddType = TitleAddType.QUEUE,
+        weight: Double = 1.0,
+        discardOnWorldChange: Boolean = true,
+        noDuplicates: Boolean = true,
+    ): TitleContext? = sendTitleInternal(
+        TitleContext(titleSupplier, subtitleSupplier, parseIntention(intention), duration, weight, discardOnWorldChange),
+        location,
+        addType,
+        noDuplicates
+    )
+
+    /**
+     * Convenience overload for legacy String titles with color code support.
      */
     fun <E : Enum<E>> sendTitle(
         titleText: String,
@@ -105,50 +100,34 @@ object TitleManager {
         location: TitleLocation = TitleLocation.GLOBAL,
         addType: TitleAddType = TitleAddType.QUEUE,
         weight: Double = 1.0,
-        /**
-         * Whether the title will be cleared from the queue when a WorldChangeEvent is triggered.
-         */
         discardOnWorldChange: Boolean = true,
-        /**
-         * Prevent duplicate entries of the same title in the queue.
-         */
         noDuplicates: Boolean = true,
-        /**
-         * Only provide these parameters if you want to use a countdown title.
-         * countDownDisplayType being not null determines code path.
-         */
-        countDownDisplayType: CountdownTitleDisplayType? = null,
-        countDownInterval: Duration = 1.seconds,
-        onInterval: () -> Unit = {},
-        onFinish: () -> Unit = {},
-        /**
-         * How long the title will 'stick around' for after the countdown is done.
-         */
-        loomDuration: Duration = 250.milliseconds,
     ): TitleContext? {
-        val parsedIntention: TitleIntention? = when (intention) {
-            null -> null
-            else -> intentionMapper[intention.name]
-        }
+        val formattedTitle = "§6" + titleText.replace("&", "§")
+        val formattedSubtitle = subtitleText?.let { "§6" + it.replace("&", "§") }
+        return sendTitle(
+            title = Renderable.text(formattedTitle, scale = 3.0),
+            subtitle = formattedSubtitle?.let { Renderable.text(it, scale = 2.25) },
+            duration = duration,
+            intention = intention,
+            location = location,
+            addType = addType,
+            weight = weight,
+            discardOnWorldChange = discardOnWorldChange,
+            noDuplicates = noDuplicates
+        )
+    }
 
-        val newTitle = TitleContext(titleText, subtitleText, parsedIntention, duration, weight).let {
-            when (countDownDisplayType) {
-                null -> it
-                else -> it.fromTitleData(
-                    countDownDisplayType,
-                    countDownInterval,
-                    loomDuration,
-                    discardOnWorldChange,
-                    onInterval,
-                    onFinish,
-                )
-            }
-        }
-
+    private fun sendTitleInternal(
+        newTitle: TitleContext,
+        location: TitleLocation,
+        addType: TitleAddType,
+        noDuplicates: Boolean,
+    ): TitleContext? {
         val targetQueue = titleLocationQueues.getOrPut(location) { CollectionUtils.OrderedQueue() }
         if (targetQueue.any { it.item == newTitle } && noDuplicates) return null
 
-        val weightOverride = if (addType == TitleAddType.FORCE_FIRST) Double.MAX_VALUE else weight
+        val weightOverride = if (addType == TitleAddType.FORCE_FIRST) Double.MAX_VALUE else newTitle.weight
         targetQueue.add(newTitle, weightOverride)
 
         return newTitle
@@ -156,19 +135,19 @@ object TitleManager {
 
     fun conditionallyStopTitle(
         location: TitleLocation? = TitleLocation.GLOBAL,
-        condition: (String) -> Boolean,
+        condition: (TitleContext) -> Boolean,
     ) = when (location) {
         null -> currentTitles.values.filterNotNull()
-            .filter { condition(it.getTitleText()) }
+            .filter(condition)
             .forEach { it.stop() }
 
         else -> currentTitles[location]?.let { title ->
-            if (condition(title.getTitleText())) title.stop()
+            if (condition(title)) title.stop()
         }
     }
 
     @HandleEvent
-    fun onCommandRegistration(event: CommandRegistrationEvent) {
+    private fun onCommandRegistration(event: CommandRegistrationEvent) {
         event.registerBrigadier("shsendtitle") {
             description = "Display a title on the screen with the specified settings."
             category = CommandCategory.DEVELOPER_TEST
@@ -190,21 +169,6 @@ object TitleManager {
                 }
             }
             literal("reset") {
-                // TODO fix the reset logic causing the title to show for one tick or so after reopening the inv
-                callback { resetCommand() }
-            }
-        }
-
-        // TODO maybe, only if possible, fix this cmd not doing anything (tested /shsendcountdowntitle 2m hey)
-        event.registerBrigadier("shsendcountdowntitle") {
-            description = "Display a countdown title on the screen with the specified settings."
-            category = CommandCategory.DEVELOPER_TEST
-            arg("duration", BrigadierArguments.string()) { duration ->
-                arg("title", BrigadierArguments.greedyString()) { title ->
-                    callback { command(getArg(duration), getArg(title), countdown = true) }
-                }
-            }
-            literal("reset") {
                 callback { resetCommand() }
             }
         }
@@ -222,25 +186,16 @@ object TitleManager {
         durationText: String,
         titleText: String,
         location: TitleLocation = TitleLocation.GLOBAL,
-        countdown: Boolean = false,
     ) {
         val duration = TimeUtils.getDurationOrNull(durationText) ?: run {
             ChatUtils.userError("Invalid duration format `$durationText`! Use e.g. 10s, or 20m or 30h")
             return
         }
-        val title = "§6" + titleText.replace("&", "§")
-
-        sendTitle(
-            title,
-            subtitleText = null,
-            duration = duration,
-            location,
-            countDownDisplayType = if (countdown) CountdownTitleDisplayType.PARTIAL_SECONDS else null,
-        )
+        sendTitle(titleText, location = location, duration = duration)
     }
 
     @HandleEvent
-    fun onDebugDataCollect(event: DebugDataCollectEvent) {
+    private fun onDebugDataCollect(event: DebugDataCollectEvent) {
         event.title("TitleManager")
         event.addIrrelevant {
             add(
@@ -268,8 +223,8 @@ object TitleManager {
         }
     }
 
-    @HandleEvent(WorldChangeEvent::class)
-    fun onWorldChange() {
+    @HandleEvent
+    private fun onWorldChange() {
         titleLocationQueues.forEach { queue ->
             val (location, titleQueue) = queue
             titleLocationQueues[location] = titleQueue.copyWithFilter { !it.discardOnWorldChange }
@@ -283,12 +238,12 @@ object TitleManager {
     }
 
     @HandleEvent
-    fun onProfileJoin() {
+    private fun onProfileJoin() {
         stop()
     }
 
     @HandleEvent
-    fun onInventoryClose() {
+    private fun onInventoryClose() {
         stop(TitleLocation.INVENTORY)
     }
 
@@ -299,8 +254,8 @@ object TitleManager {
         }
     }
 
-    @HandleEvent(SkyHanniTickEvent::class)
-    fun onTick() {
+    @HandleEvent
+    private fun onTick() {
         TitleLocation.entries.filter {
             it.activationRequirement.invoke()
         }.forEach { location ->
@@ -339,14 +294,14 @@ object TitleManager {
     }
 
     @HandleEvent
-    fun onGuiRenderOverlay(event: GuiRenderEvent.GuiOverlayRenderEvent) {
+    private fun onGuiRenderOverlay() {
         if (InventoryUtils.inInventory()) return
         val globalTitle = currentTitles[TitleLocation.GLOBAL] ?: return
         globalTitle.tryRenderGlobalTitle()
     }
 
     @HandleEvent
-    fun onChestGuiRender(event: GuiRenderEvent.ChestGuiOverlayRenderEvent) {
+    private fun onChestGuiRender() {
         if (!InventoryUtils.inInventory()) return
         val inventoryTitle = currentTitles[TitleLocation.INVENTORY] ?: return
         inventoryTitle.tryRenderInventoryTitle()

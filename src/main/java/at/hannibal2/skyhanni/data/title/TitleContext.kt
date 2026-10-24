@@ -7,7 +7,6 @@ import at.hannibal2.skyhanni.utils.RenderUtils
 import at.hannibal2.skyhanni.utils.SimpleTimeMark
 import at.hannibal2.skyhanni.utils.SimpleTimeMark.Companion.farPast
 import at.hannibal2.skyhanni.utils.SimpleTimeMark.Companion.now
-import at.hannibal2.skyhanni.utils.collection.RenderableCollectionUtils.addString
 import at.hannibal2.skyhanni.utils.compat.DrawContextUtils
 import at.hannibal2.skyhanni.utils.compat.GuiScreenUtils
 import at.hannibal2.skyhanni.utils.compat.MinecraftCompat
@@ -15,7 +14,6 @@ import at.hannibal2.skyhanni.utils.compat.SkyHanniGuiContainer
 import at.hannibal2.skyhanni.utils.renderables.Renderable
 import at.hannibal2.skyhanni.utils.renderables.RenderableUtils.renderXYAligned
 import at.hannibal2.skyhanni.utils.renderables.container.VerticalContainerRenderable.Companion.vertical
-import at.hannibal2.skyhanni.utils.renderables.primitives.text
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -25,20 +23,30 @@ data class TitleIntention(
 )
 
 open class TitleContext(
-    private var titleText: String = "",
-    private var subtitleText: String? = null,
+    private val titleSupplier: () -> Renderable,
+    private val subtitleSupplier: (() -> Renderable)? = null,
     private var intention: TitleIntention? = null,
     var duration: Duration = 1.seconds,
     val weight: Double = 1.0,
     var discardOnWorldChange: Boolean = true,
 ) {
+    constructor(
+        title: Renderable,
+        subtitle: Renderable? = null,
+        intention: TitleIntention? = null,
+        duration: Duration = 1.seconds,
+        weight: Double = 1.0,
+        discardOnWorldChange: Boolean = true,
+    ) : this({ title }, subtitle?.let { { it } }, intention, duration, weight, discardOnWorldChange)
+
     var endTime: SimpleTimeMark? = null
     private var hasBeenReQueued: Boolean = false
 
     open val alive get() = endTime != null && (endTime?.isInPast() == false)
 
-    open fun getTitleText(): String = titleText
-    open fun getSubtitleText(): String? = subtitleText
+    open fun getTitleRenderable(): Renderable = titleSupplier()
+    open fun getSubtitleRenderable(): Renderable? = subtitleSupplier?.invoke()
+
     open fun start() {
         if (endTime == null || endTime?.isInPast() == true) {
             endTime = now() + duration
@@ -58,13 +66,11 @@ open class TitleContext(
 
     override fun equals(other: Any?): Boolean = this === other || other is TitleContext && this.dataEquivalent(other)
     override fun hashCode(): Int =
-        titleText.hashCode() * 31 + (subtitleText?.hashCode() ?: 0) * 31 +
+        titleSupplier.hashCode() * 31 + subtitleSupplier.hashCode() * 31 +
             duration.hashCode() * 31 + weight.hashCode()
 
-    protected fun dataEquivalent(other: TitleContext): Boolean = titleText == other.titleText &&
-        subtitleText == other.subtitleText &&
-        duration == other.duration &&
-        weight == other.weight
+    protected fun dataEquivalent(other: TitleContext): Boolean =
+        duration == other.duration && weight == other.weight
 
     private fun TitleIntention.getPositionOrNull(location: TitleManager.TitleLocation): Position? {
         val intentionPosition = TitleManager.guiConfig.titleIntentionPositions[location]
@@ -76,27 +82,13 @@ open class TitleContext(
         val position = intentionPosition ?: TitleManager.guiConfig.titlePosition
         val guiWidth = GuiScreenUtils.scaledWindowWidth
 
-        val mainScalar = position.scale * 3.0
-        val subScalar = mainScalar * 0.75f
-
         DrawContextUtils.pushPop {
-            val mainTextRenderable = Renderable.text(
-                getTitleText(),
-                scale = mainScalar,
-                horizontalAlign = RenderUtils.HorizontalAlignment.CENTER,
-            )
+            val mainRenderable = getTitleRenderable()
+            val subtitleRenderable = getSubtitleRenderable()
 
-            val subtitleRenderable: Renderable? = getSubtitleText()?.let {
-                Renderable.text(
-                    it,
-                    scale = subScalar,
-                    horizontalAlign = RenderUtils.HorizontalAlignment.CENTER,
-                )
-            }
-
-            val targetRenderable = if (subtitleRenderable == null) mainTextRenderable
+            val targetRenderable = if (subtitleRenderable == null) mainRenderable
             else Renderable.vertical(
-                mainTextRenderable,
+                mainRenderable,
                 subtitleRenderable,
                 horizontalAlign = RenderUtils.HorizontalAlignment.CENTER,
                 verticalAlign = RenderUtils.VerticalAlignment.CENTER,
@@ -106,7 +98,6 @@ open class TitleContext(
             val renderableHeight = targetRenderable.height
 
             val translationX = (guiWidth - renderableWidth) / 2
-            // moving the display to the bottom half of your screen is futile
             val translationY = position.y.takeIf { it >= 0 } ?: 100
             if (translationX != position.x || translationY != position.y) {
                 position.set(Position(translationX, translationY, scale = position.scale))
@@ -116,8 +107,7 @@ open class TitleContext(
             targetRenderable.renderXYAligned(0, 0, renderableWidth, renderableHeight)
 
             if (intentionPosition != null) {
-                // Intention is never null here, but it's mutable so
-                val qualifiedIntention = intention ?: return
+                val qualifiedIntention = intention ?: return@pushPop
                 val intentionFormat = "Title: ${qualifiedIntention.displayName}"
                 GuiEditManager.add(intentionPosition, intentionFormat, targetRenderable.width, targetRenderable.height)
             } else {
@@ -129,26 +119,23 @@ open class TitleContext(
     fun tryRenderInventoryTitle() {
         val gui = MinecraftCompat.screen as? SkyHanniGuiContainer ?: return
 
-        val stringRenderable = with(Renderable) {
-            vertical(horizontalAlign = RenderUtils.HorizontalAlignment.CENTER) {
-                addString(
-                    getTitleText(),
-                    1.5,
-                    horizontalAlign = RenderUtils.HorizontalAlignment.CENTER,
-                )
-                getSubtitleText()?.let {
-                    addString(it, horizontalAlign = RenderUtils.HorizontalAlignment.CENTER)
-                }
-            }
-        }
+        val mainRenderable = getTitleRenderable()
+        val subtitleRenderable = getSubtitleRenderable()
 
-        val translation = stringRenderable.height.toFloat() + 125f
+        val targetRenderable = if (subtitleRenderable == null) mainRenderable
+        else Renderable.vertical(
+            mainRenderable,
+            subtitleRenderable,
+            horizontalAlign = RenderUtils.HorizontalAlignment.CENTER,
+            verticalAlign = RenderUtils.VerticalAlignment.CENTER,
+        )
+
+        val translation = targetRenderable.height.toFloat() + 125f
 
         DrawContextUtils.pushPop {
             DrawContextUtils.translate(0f, -translation)
-            // TODO use Renderable.withMousePosition
             Renderable.drawInsideRoundedRect(
-                stringRenderable,
+                targetRenderable,
                 ColorUtils.TRANSPARENT_COLOR,
                 horizontalAlign = RenderUtils.HorizontalAlignment.CENTER,
                 verticalAlign = RenderUtils.VerticalAlignment.CENTER,
@@ -159,8 +146,7 @@ open class TitleContext(
     }
 
     override fun toString(): String = buildString {
-        append("Title: ${getTitleText()}\n")
-        append("Subtitle: ${getSubtitleText()}\n")
+        append("Title: [Renderable Component]\n")
         append("Duration: ${duration.inWholeSeconds}s\n")
         append("Weight: ${weight}\n")
         append("End Time: ${endTime?.timeUntil()?.inWholeSeconds ?: 0.0}s\n")
