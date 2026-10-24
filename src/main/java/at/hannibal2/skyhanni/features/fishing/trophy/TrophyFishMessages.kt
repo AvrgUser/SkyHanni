@@ -120,7 +120,7 @@ object TrophyFishMessages {
                         append(" ")
                         append(displayName)
                         if (amountCaught > 1) {
-                            appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
+                            appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
                         }
                     }
                 } else {
@@ -132,7 +132,7 @@ object TrophyFishMessages {
                         append(" ")
                         append(displayName)
                         if (amountCaught > 1) {
-                            appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
+                            appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
                         }
                     }
                 }
@@ -143,12 +143,12 @@ object TrophyFishMessages {
                     append(displayName)
                     append(" ")
                     append(displayRarity)
+                    if (amountCaught > 1) {
+                        appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
+                    }
                     appendWithColor(".", ChatFormatting.AQUA)
                     if (totalCaught > 1) {
                         appendWithColor(" (${totalCaught.addSeparators()})", ChatFormatting.GRAY)
-                    }
-                    if (amountCaught > 1) {
-                        appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
                     }
                 }
 
@@ -161,10 +161,10 @@ object TrophyFishMessages {
                     append(displayRarity)
                     append(" ")
                     append(displayName)
-                    appendWithColor(".", ChatFormatting.AQUA)
                     if (amountCaught > 1) {
-                        appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
+                        appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
                     }
+                    appendWithColor(".", ChatFormatting.AQUA)
                 }
             }
             componentBuilder {
