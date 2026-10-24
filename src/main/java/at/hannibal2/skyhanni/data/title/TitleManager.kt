@@ -9,7 +9,9 @@ import at.hannibal2.skyhanni.events.DebugDataCollectEvent
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
 import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.InventoryUtils
+import at.hannibal2.skyhanni.utils.SimpleTimeMark
 import at.hannibal2.skyhanni.utils.TimeUtils
+import at.hannibal2.skyhanni.utils.TimeUtils.format
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils
 import at.hannibal2.skyhanni.utils.collection.CollectionUtils.enumMapOf
 import at.hannibal2.skyhanni.utils.renderables.Renderable
@@ -108,6 +110,56 @@ object TitleManager {
         return sendTitle(
             title = Renderable.text(formattedTitle, scale = 3.0),
             subtitle = formattedSubtitle?.let { Renderable.text(it, scale = 2.25) },
+            duration = duration,
+            intention = intention,
+            location = location,
+            addType = addType,
+            weight = weight,
+            discardOnWorldChange = discardOnWorldChange,
+            noDuplicates = noDuplicates
+        )
+    }
+
+    /**
+     * Send a timed/countdown title supporting %t (duration string) and %f (formatted time) placeholders.
+     */
+    fun <E : Enum<E>> sendTimedTitle(
+        titleTemplate: String,
+        subtitleTemplate: String? = null,
+        duration: Duration = 5.seconds,
+        intention: E? = null,
+        location: TitleLocation = TitleLocation.GLOBAL,
+        addType: TitleAddType = TitleAddType.QUEUE,
+        weight: Double = 1.0,
+        discardOnWorldChange: Boolean = true,
+        noDuplicates: Boolean = true,
+        onInterval: (() -> Unit)? = null,
+    ): TitleContext? {
+        val endTime = SimpleTimeMark.now() + duration
+        var lastWholeSecond = -1
+
+        fun String.formatTimedString(remaining: Duration): String {
+            return this
+                .replace("%t", remaining.toString())
+                .replace("%f", remaining.format())
+        }
+
+        return sendTitle(
+            titleSupplier = {
+                val remaining = endTime.timeUntil().coerceAtLeast(Duration.ZERO)
+                val wholeSeconds = remaining.inWholeSeconds.toInt()
+                if (onInterval != null && wholeSeconds != lastWholeSecond && wholeSeconds >= 0) {
+                    lastWholeSecond = wholeSeconds
+                    onInterval()
+                }
+                Renderable.text(titleTemplate.formatTimedString(remaining), scale = 3.0)
+            },
+            subtitleSupplier = subtitleTemplate?.let { template ->
+                {
+                    val remaining = endTime.timeUntil().coerceAtLeast(Duration.ZERO)
+                    Renderable.text(template.formatTimedString(remaining), scale = 2.25)
+                }
+            },
             duration = duration,
             intention = intention,
             location = location,

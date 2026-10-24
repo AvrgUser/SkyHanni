@@ -36,6 +36,7 @@ import at.hannibal2.skyhanni.utils.NumberUtil.formatPercentage
 import at.hannibal2.skyhanni.utils.NumberUtil.roundTo
 import at.hannibal2.skyhanni.utils.RenderUtils.renderRenderable
 import at.hannibal2.skyhanni.utils.RenderUtils.renderRenderables
+import at.hannibal2.skyhanni.utils.SimpleTimeMark
 import at.hannibal2.skyhanni.utils.SoundUtils
 import at.hannibal2.skyhanni.utils.TimeUtils.format
 import at.hannibal2.skyhanni.utils.collection.RenderableCollectionUtils.addItemStack
@@ -283,7 +284,7 @@ object GardenCropMilestoneDisplay {
         return Pair(have, need)
     }
 
-    private fun tryWarn(timeLeft: Duration, title: String, crop: CropType) {
+    private fun tryWarn(timeLeft: Duration, titleTemplate: String, crop: CropType) {
         val isConfigEnabled = config.warnClose
         val isCropBreakEnabled = (GardenCropSpeed.lastBrokenTime.passedSince() < 500.milliseconds)
         val isTimeLeftValid = timeLeft <= 6.seconds
@@ -297,11 +298,10 @@ object GardenCropMilestoneDisplay {
         lastTitleWarnedLevel = crop.getCurrentMilestoneTier().takeIf { it != lastTitleWarnedLevel } ?: return
         if (inaccurateMilestone || countdownTitleContext != null) return
 
-        countdownTitleContext = TitleManager.sendTitle(
-            title,
+        countdownTitleContext = TitleManager.sendTimedTitle(
+            titleTemplate = titleTemplate,
             duration = timeLeft,
             addType = TitleManager.TitleAddType.FORCE_FIRST,
-            countDownDisplayType = TitleManager.CountdownTitleDisplayType.WHOLE_SECONDS,
             onInterval = SoundUtils::playBeepSound,
         )
     }
