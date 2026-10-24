@@ -12,9 +12,7 @@ import at.hannibal2.skyhanni.utils.render.item.SkyHanniPipCoordinatorRenderer
 import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
-import net.minecraft.client.DeltaTracker
 import net.minecraft.client.gui.GuiGraphicsExtractor
-import net.minecraft.resources.Identifier
 
 @SkyHanniModule
 object RenderEvents {
@@ -23,7 +21,10 @@ object RenderEvents {
     init {
         HudElementRegistry.attachElementBefore(
             VanillaHudElements.SLEEP,
-            Identifier.fromNamespaceAndPath("skyhanni", "gui_render_layer"),
+            SkyHanniMod.id("gui_render_layer"),
+            //? if < 26.4
+            //{ context, _ -> postGui(context) }
+            //? else
             RenderEvents::postGui
         )
 
@@ -40,7 +41,7 @@ object RenderEvents {
         SkyHanniItemRenderCoordinator.invalidateAtlas()
     }
 
-    private fun postGui(context: GuiGraphicsExtractor, tick: DeltaTracker) {
+    private fun postGui(context: GuiGraphicsExtractor) {
         if (MinecraftCompat.hideGui) return
         if (config.hideGuiInDebugMenu && MinecraftCompat.showDebugHud) return
         RenderData.postRenderOverlay(context)

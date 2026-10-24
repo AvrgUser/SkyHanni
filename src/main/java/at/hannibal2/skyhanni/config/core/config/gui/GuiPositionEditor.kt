@@ -317,8 +317,10 @@ private class OldScreenRenderContext(
 
         DrawContextUtils.pushPop {
             DrawContextUtils.scale(scaleX, scaleY)
-            oldScreen.extractBackground(DrawContextUtils.drawContext, oldScreenMouseX, oldScreenMouseY, partialTicks)
-            oldScreen.extractRenderState(DrawContextUtils.drawContext, oldScreenMouseX, oldScreenMouseY, partialTicks)
+            //~ if < 26.4 ')' -> ', oldScreenMouseX, oldScreenMouseY, partialTicks)' {
+            oldScreen.extractBackground(DrawContextUtils.drawContext)
+            oldScreen.extractRenderState(DrawContextUtils.drawContext)
+            //~}
         }
     }
 

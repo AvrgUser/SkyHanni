@@ -70,14 +70,8 @@ import at.hannibal2.skyhanni.utils.renderables.Renderable
 import at.hannibal2.skyhanni.utils.renderables.addLine
 import at.hannibal2.skyhanni.utils.system.PlatformUtils
 import com.mojang.blaze3d.platform.InputConstants
-import net.minecraft.client.gui.components.debug.DebugScreenDisplayer
-import net.minecraft.client.gui.components.debug.DebugScreenEntries
-import net.minecraft.client.gui.components.debug.DebugScreenEntry
 import net.minecraft.nbt.CompoundTag
-import net.minecraft.resources.Identifier
 import net.minecraft.world.item.Items
-import net.minecraft.world.level.Level
-import net.minecraft.world.level.chunk.LevelChunk
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.AnnotationNode
@@ -97,13 +91,13 @@ object SkyHanniDebugsAndTests {
     private var displayList = emptyList<Renderable>()
 
     init {
-        registerDebugScreenEntry("current_area", SkyBlockUtils::inSkyBlock) {
+        DebugEntriesApi.registerDebugScreenEntry("current_area", SkyBlockUtils::inSkyBlock) {
             add("[SkyHanni] Current Area: ${HypixelData.skyBlockArea}")
             add("[SkyHanni] Graph Area: ${SkyBlockUtils.graphArea}")
         }
 
         // TODO can we rename this to ore_block?
-        registerDebugScreenEntry("targeted_oreblock", SkyBlockUtils::inSkyBlock) {
+        DebugEntriesApi.registerDebugScreenEntry("targeted_oreblock", SkyBlockUtils::inSkyBlock) {
             BlockUtils.getTargetedBlockAtDistance(50.0).let { pos ->
                 OreBlock.getByStateOrNull(pos.getBlockStateAt())?.let { ore ->
                     add("[SkyHanni] Looking at: ${ore.name} (${pos.toCleanString()})")
@@ -111,7 +105,7 @@ object SkyHanniDebugsAndTests {
             }
         }
 
-        registerDebugScreenEntry("test", { !displayLine.isNullOrBlank() }) {
+        DebugEntriesApi.registerDebugScreenEntry("test", { !displayLine.isNullOrBlank() }) {
             add("[SkyHanni Test] $displayLine")
         }
     }
@@ -338,30 +332,6 @@ object SkyHanniDebugsAndTests {
             "navigate" -> "`/shnavigate $localFormat`" to "navigate"
             else -> "LorenzVec(${location.x}, ${location.y}, ${location.z})" to "LorenzVec"
         }
-    }
-
-    private fun registerDebugScreenEntry(
-        name: String,
-        condition: () -> Boolean = { true },
-        lineBuilder: MutableList<String>.() -> Unit,
-    ) {
-        val id = Identifier.fromNamespaceAndPath("skyhanni", name)
-        DebugScreenEntries.register(
-            id,
-            object : DebugScreenEntry {
-                override fun display(
-                    displayer: DebugScreenDisplayer,
-                    level: Level?,
-                    clientChunk: LevelChunk?,
-                    serverChunk: LevelChunk?,
-                ) {
-                    if (level == null || !condition()) return
-                    displayer.addToGroup(id, buildList(lineBuilder))
-                }
-
-                override fun isAllowed(reducedDebugInfo: Boolean) = true
-            },
-        )
     }
 
     private var skinId: String? = null

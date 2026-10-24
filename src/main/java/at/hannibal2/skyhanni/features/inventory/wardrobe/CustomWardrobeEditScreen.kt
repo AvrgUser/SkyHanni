@@ -32,8 +32,13 @@ class CustomWardrobeEditScreen(
         }
     }
 
-    override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+    //? if < 26.4 {
+    /*override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick)
+    *///?} else {
+    override fun extractRenderState(graphics: GuiGraphicsExtractor) {
+        super.extractRenderState(graphics)
+    //?}
         DrawContextUtils.setContext(graphics)
         try {
             onDrawScreen()

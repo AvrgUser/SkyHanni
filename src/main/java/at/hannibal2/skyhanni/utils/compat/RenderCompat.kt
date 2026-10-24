@@ -1,11 +1,11 @@
 package at.hannibal2.skyhanni.utils.compat
 
+import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.renderpearl.api.commands.RenderPass
 import com.mojang.renderpearl.api.device.GpuDevice
-import com.mojang.renderpearl.api.pipeline.RenderPipeline
-import net.minecraft.client.renderer.RenderPipelines
+import net.minecraft.client.renderer.pipeline.RenderPipelines
 import java.util.OptionalDouble
 
 //? if >= 26.2 {

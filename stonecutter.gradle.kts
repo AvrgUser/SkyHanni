@@ -130,6 +130,11 @@ stonecutter parameters {
     }
 
     replacements {
+        string(current.parsed < "26.4") {
+            replace("import net.minecraft.client.renderer.pipeline.RenderPipelines", "import net.minecraft.client.renderer.RenderPipelines")
+            replace("import com.mojang.blaze3d.pipeline.RenderPipeline", "import com.mojang.renderpearl.api.pipeline.RenderPipeline")
+        }
+
         string(current.parsed < "26.3") {
             replace("#include", "#moj_import")
             replace("import net.minecraft.world.entity.monster.Enderman;", "import net.minecraft.world.entity.monster.EnderMan;")

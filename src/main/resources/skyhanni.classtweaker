@@ -76,6 +76,11 @@ mutable field net/minecraft/core/particles/ColorParticleOption color I
 mutable field net/minecraft/world/item/ItemStack components Lnet/minecraft/core/component/PatchedDataComponentMap;
 mutable field net/minecraft/world/item/ItemStack item Lnet/minecraft/core/Holder;
 
+#? if >= 26.4 {
+accessible field net/minecraft/world/level/block/StainedGlassBlock color Lnet/minecraft/world/item/DyeColor;
+accessible field net/minecraft/world/level/block/StainedGlassPaneBlock color Lnet/minecraft/world/item/DyeColor;
+#?}
+
 #? if >= 26.3 {
 accessible class net/minecraft/core/component/Removed
 accessible field net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen text Lnet/minecraft/world/level/block/entity/SignText$Mutable;

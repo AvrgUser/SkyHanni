@@ -7,10 +7,10 @@ import at.hannibal2.skyhanni.utils.render.SkyHanniRenderPipelineUtils.commonChro
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.renderpearl.api.pipeline.BlendFunction
 import com.mojang.renderpearl.api.pipeline.ColorTargetState
-import com.mojang.renderpearl.api.pipeline.RenderPipeline
+import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.renderpearl.api.pipeline.UniformType
 import com.mojang.renderpearl.api.vertex.VertexFormat
-import net.minecraft.client.renderer.RenderPipelines
+import net.minecraft.client.renderer.pipeline.RenderPipelines
 import java.util.Optional
 
 //? if >= 26.2 {

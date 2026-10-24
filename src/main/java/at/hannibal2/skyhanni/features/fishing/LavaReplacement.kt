@@ -55,7 +55,10 @@ object LavaReplacement {
     fun getReplacementModel(state: FluidState, original: FluidModel): FluidModel {
         if (!isActive) return original
         return when (state.type) {
-            Fluids.LAVA, Fluids.FLOWING_LAVA -> opaqueWaterModel ?: original
+            Fluids.LAVA,
+            //? if < 26.4
+            //Fluids.FLOWING_LAVA,
+             -> opaqueWaterModel ?: original
             else -> original
         }
     }
