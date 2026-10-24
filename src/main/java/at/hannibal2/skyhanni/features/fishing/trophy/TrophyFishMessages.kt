@@ -141,11 +141,11 @@ object TrophyFishMessages {
                     appendWithColor("You caught a", ChatFormatting.AQUA)
                     append(" ")
                     append(displayName)
-                    append(" ")
-                    append(displayRarity)
                     if (amountCaught > 1) {
                         appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
                     }
+                    append(" ")
+                    append(displayRarity)
                     appendWithColor(".", ChatFormatting.AQUA)
                     if (totalCaught > 1) {
                         appendWithColor(" (${totalCaught.addSeparators()})", ChatFormatting.GRAY)
