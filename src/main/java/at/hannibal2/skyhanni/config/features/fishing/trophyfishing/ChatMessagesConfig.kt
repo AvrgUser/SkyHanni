@@ -20,7 +20,7 @@ class ChatMessagesConfig {
     @ConfigOption(
         name = "Trophy Counter Design",
         desc =
-            "§fStyle 1: §c§lFIRST §6§lGOLD §5Moldfin\n" +
+        "§fStyle 1: §c§lFIRST §6§lGOLD §5Moldfin\n" +
             "§f           §72nd §6§lGOLD §5Moldfin §7x2\n" +
             "§fStyle 2: §bYou caught a §5Moldfin §6§lGOLD§b. §7(2)\n" +
             "§f           §bYou caught a §5Moldfin §7x2 §6§lGOLD§b. §7(4)\n" +
