@@ -59,12 +59,21 @@ object TrophyFishMessages {
 
         val trophyFishes = TrophyFishManager.fish ?: return
         val trophyFishCounts = trophyFishes.getOrPut(internalName) { mutableMapOf() }
-        val totalCaught = trophyFishCounts.addOrPut(rarity, amountCaught)
+        val isFirstCatch = rarity !in trophyFishCounts
+        trophyFishCounts.addOrPut(rarity, amountCaught)
         TrophyFishCaughtEvent(internalName, rarity, amountCaught).post()
 
-        if (shouldBlockTrophyFish(rarity, totalCaught)) {
-            event.blockedReason = "low_trophy_fish"
-            return
+
+        if (!isFirstCatch) {
+            val hideLowRarity = when (rarity) {
+                BRONZE -> config.bronzeHider
+                SILVER -> config.silverHider
+                else -> false
+            }
+            if (hideLowRarity) {
+                event.blockedReason = "low_trophy_fish"
+                return
+            }
         }
 
         if (config.duplicateHider) event.chatLineId = (internalName + rarity).hashCode()
@@ -90,8 +99,8 @@ object TrophyFishMessages {
         val totalCaught = trophyFishCounts[rarity] ?: amountCaught
 
         val alert = when (rarity) {
-            TrophyRarity.GOLD -> config.goldAlert
-            TrophyRarity.DIAMOND -> config.diamondAlert
+            GOLD -> config.goldAlert
+            DIAMOND -> config.diamondAlert
             else -> false
         }
         if (alert) {
@@ -110,6 +119,9 @@ object TrophyFishMessages {
                         append(displayRarity)
                         append(" ")
                         append(displayName)
+                        if (amountCaught > 1) {
+                            appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
+                        }
                     }
                 } else {
                     componentBuilder {
@@ -119,6 +131,9 @@ object TrophyFishMessages {
                         append(displayRarity)
                         append(" ")
                         append(displayName)
+                        if (amountCaught > 1) {
+                            appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
+                        }
                     }
                 }
 
@@ -130,8 +145,10 @@ object TrophyFishMessages {
                     append(displayRarity)
                     appendWithColor(".", ChatFormatting.AQUA)
                     if (totalCaught > 1) {
-                        append(" ")
-                        appendWithColor("(${totalCaught.addSeparators()})", ChatFormatting.GRAY)
+                        appendWithColor(" (${totalCaught.addSeparators()})", ChatFormatting.GRAY)
+                    }
+                    if (amountCaught > 1) {
+                        appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
                     }
                 }
 
@@ -145,6 +162,9 @@ object TrophyFishMessages {
                     append(" ")
                     append(displayName)
                     appendWithColor(".", ChatFormatting.AQUA)
+                    if (amountCaught > 1) {
+                        appendWithColor(" (x${amountCaught.addSeparators()})", ChatFormatting.GRAY)
+                    }
                 }
             }
             componentBuilder {
@@ -182,14 +202,6 @@ object TrophyFishMessages {
         // TODO: TitleManager with Component support
         TitleManager.sendTitle(text)
     }
-
-    private fun shouldBlockTrophyFish(rarity: TrophyRarity, amount: Int) =
-        config.bronzeHider &&
-            rarity == TrophyRarity.BRONZE &&
-            amount != 1 ||
-            config.silverHider &&
-            rarity == TrophyRarity.SILVER &&
-            amount != 1
 
     @HandleEvent
     private fun onConfigFix(event: ConfigUpdaterMigrator.ConfigFixEvent) {
