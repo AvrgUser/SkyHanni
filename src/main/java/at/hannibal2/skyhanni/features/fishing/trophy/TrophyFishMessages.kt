@@ -109,64 +109,12 @@ object TrophyFishMessages {
         }
 
         var edited = if (config.enabled) {
-            val designFormat = when (config.design) {
-                STYLE_1 -> if (totalCaught == 1) {
-                    componentBuilder {
-                        appendWithColor("FIRST", ChatFormatting.RED) {
-                            bold = true
-                        }
-                        append(" ")
-                        append(displayRarity)
-                        append(" ")
-                        append(displayName)
-                        if (amountCaught > 1) {
-                            appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
-                        }
-                    }
-                } else {
-                    componentBuilder {
-                        appendWithColor(totalCaught.toString(), ChatFormatting.GRAY)
-                        appendWithColor(totalCaught.ordinal(), ChatFormatting.GRAY)
-                        append(" ")
-                        append(displayRarity)
-                        append(" ")
-                        append(displayName)
-                        if (amountCaught > 1) {
-                            appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
-                        }
-                    }
-                }
-
-                STYLE_2 -> componentBuilder {
-                    appendWithColor("You caught a", ChatFormatting.AQUA)
-                    append(" ")
-                    append(displayName)
-                    if (amountCaught > 1) {
-                        appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
-                    }
-                    append(" ")
-                    append(displayRarity)
-                    appendWithColor(".", ChatFormatting.AQUA)
-                    if (totalCaught > 1) {
-                        appendWithColor(" (${totalCaught.addSeparators()})", ChatFormatting.GRAY)
-                    }
-                }
-
-                STYLE_3 -> componentBuilder {
-                    appendWithColor("You caught your", ChatFormatting.AQUA)
-                    append(" ")
-                    appendWithColor(totalCaught.addSeparators(), ChatFormatting.GRAY)
-                    appendWithColor(totalCaught.ordinal(), ChatFormatting.GRAY)
-                    append(" ")
-                    append(displayRarity)
-                    append(" ")
-                    append(displayName)
-                    if (amountCaught > 1) {
-                        appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
-                    }
-                    appendWithColor(".", ChatFormatting.AQUA)
-                }
-            }
+            val designFormat = createDesignFormat(
+                displayName,
+                displayRarity,
+                totalCaught,
+                amountCaught,
+            )
             componentBuilder {
                 append(SkyblockStat.TROPHY_CHANCE.icon)
                 appendWithColor(" TROPHY FISH! ", ChatFormatting.GOLD) {
@@ -193,6 +141,70 @@ object TrophyFishMessages {
         }
 
         event.replaceComponent(edited, "TROPHY_FISH")
+    }
+
+    private fun createDesignFormat(
+        displayName: Component,
+        displayRarity: Component,
+        totalCaught: Int,
+        amountCaught: Int,
+    ) = when (config.design) {
+        STYLE_1 -> if (totalCaught == 1) {
+            componentBuilder {
+                appendWithColor("FIRST", ChatFormatting.RED) {
+                    bold = true
+                }
+                append(" ")
+                append(displayRarity)
+                append(" ")
+                append(displayName)
+                if (amountCaught > 1) {
+                    appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
+                }
+            }
+        } else {
+            componentBuilder {
+                appendWithColor(totalCaught.toString(), ChatFormatting.GRAY)
+                appendWithColor(totalCaught.ordinal(), ChatFormatting.GRAY)
+                append(" ")
+                append(displayRarity)
+                append(" ")
+                append(displayName)
+                if (amountCaught > 1) {
+                    appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
+                }
+            }
+        }
+
+        STYLE_2 -> componentBuilder {
+            appendWithColor("You caught a", ChatFormatting.AQUA)
+            append(" ")
+            append(displayName)
+            if (amountCaught > 1) {
+                appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
+            }
+            append(" ")
+            append(displayRarity)
+            appendWithColor(".", ChatFormatting.AQUA)
+            if (totalCaught > 1) {
+                appendWithColor(" (${totalCaught.addSeparators()})", ChatFormatting.GRAY)
+            }
+        }
+
+        STYLE_3 -> componentBuilder {
+            appendWithColor("You caught your", ChatFormatting.AQUA)
+            append(" ")
+            appendWithColor(totalCaught.addSeparators(), ChatFormatting.GRAY)
+            appendWithColor(totalCaught.ordinal(), ChatFormatting.GRAY)
+            append(" ")
+            append(displayRarity)
+            append(" ")
+            append(displayName)
+            if (amountCaught > 1) {
+                appendWithColor(" x${amountCaught.addSeparators()}", ChatFormatting.GRAY)
+            }
+            appendWithColor(".", ChatFormatting.AQUA)
+        }
     }
 
     private fun sendTitle(displayName: Component, displayRarity: Component, amount: Int) {
