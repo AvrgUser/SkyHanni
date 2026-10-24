@@ -59,10 +59,10 @@ object TrophyFishMessages {
 
         val trophyFishes = TrophyFishManager.fish ?: return
         val trophyFishCounts = trophyFishes.getOrPut(internalName) { mutableMapOf() }
-        val amount = trophyFishCounts.addOrPut(rarity, amountCaught)
-        TrophyFishCaughtEvent(internalName, rarity, amount).post()
+        val totalCaught = trophyFishCounts.addOrPut(rarity, amountCaught)
+        TrophyFishCaughtEvent(internalName, rarity, amountCaught).post()
 
-        if (shouldBlockTrophyFish(rarity, amount)) {
+        if (shouldBlockTrophyFish(rarity, totalCaught)) {
             event.blockedReason = "low_trophy_fish"
             return
         }
@@ -87,7 +87,7 @@ object TrophyFishMessages {
 
         val trophyFishes = TrophyFishManager.fish ?: return
         val trophyFishCounts = trophyFishes.getOrPut(internalName) { mutableMapOf() }
-        val amount = trophyFishCounts[rarity] ?: amountCaught
+        val totalCaught = trophyFishCounts[rarity] ?: amountCaught
 
         val alert = when (rarity) {
             TrophyRarity.GOLD -> config.goldAlert
@@ -95,13 +95,13 @@ object TrophyFishMessages {
             else -> false
         }
         if (alert) {
-            sendTitle(displayName, displayRarity, amount)
+            sendTitle(displayName, displayRarity, totalCaught)
             if (config.playSound) SoundUtils.playBeepSound()
         }
 
         var edited = if (config.enabled) {
             val designFormat = when (config.design) {
-                STYLE_1 -> if (amount == 1) {
+                STYLE_1 -> if (totalCaught == 1) {
                     componentBuilder {
                         appendWithColor("FIRST", ChatFormatting.RED) {
                             bold = true
@@ -113,8 +113,8 @@ object TrophyFishMessages {
                     }
                 } else {
                     componentBuilder {
-                        appendWithColor(amount.toString(), ChatFormatting.GRAY)
-                        appendWithColor(amount.ordinal(), ChatFormatting.GRAY)
+                        appendWithColor(totalCaught.toString(), ChatFormatting.GRAY)
+                        appendWithColor(totalCaught.ordinal(), ChatFormatting.GRAY)
                         append(" ")
                         append(displayRarity)
                         append(" ")
@@ -129,17 +129,17 @@ object TrophyFishMessages {
                     append(" ")
                     append(displayRarity)
                     appendWithColor(".", ChatFormatting.AQUA)
-                    if (amount > 1) {
+                    if (totalCaught > 1) {
                         append(" ")
-                        appendWithColor("(${amount.addSeparators()})", ChatFormatting.GRAY)
+                        appendWithColor("(${totalCaught.addSeparators()})", ChatFormatting.GRAY)
                     }
                 }
 
                 STYLE_3 -> componentBuilder {
                     appendWithColor("You caught your", ChatFormatting.AQUA)
                     append(" ")
-                    appendWithColor(amount.addSeparators(), ChatFormatting.GRAY)
-                    appendWithColor(amount.ordinal(), ChatFormatting.GRAY)
+                    appendWithColor(totalCaught.addSeparators(), ChatFormatting.GRAY)
+                    appendWithColor(totalCaught.ordinal(), ChatFormatting.GRAY)
                     append(" ")
                     append(displayRarity)
                     append(" ")
@@ -156,6 +156,7 @@ object TrophyFishMessages {
             }
         } else event.chatComponent.copy()
 
+        // This is the total amount of this trophy fish across all rarities
         if (config.totalAmount) {
             val total = trophyFishCounts.sumAllValues()
             edited = componentBuilder {
