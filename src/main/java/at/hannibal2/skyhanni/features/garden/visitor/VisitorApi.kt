@@ -249,7 +249,7 @@ object VisitorApi {
         CHEAP_COPPER("§aCheap copper", true),
         EXPENSIVE_COPPER("§cExpensive copper", false),
         LOW_LOSS("§aLow Loss", true),
-        HIGH_LOSS("§cHigh Loss", false)
+        HIGH_LOSS("§cHigh Loss", false),
     }
 
     @HandleEvent
