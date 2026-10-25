@@ -43,7 +43,7 @@ object DungeonChatFilter {
              * REGEX-TEST: [Berserk] Melee Damage 48% -> 88%
              * REGEX-TEST: [Berserk] Walk Speed 38 -> 68
              */
-            "\\[\\w+] .* \\d+%? -> \\d+%?",
+            "\\[\\w+] .* [\\d,.]+%? -> [\\d,.]+%?",
             "\\[NPC] Mort: Here, I found this map when I first entered the dungeon.",
             "\\[NPC] Mort: You should find it useful if you get lost.",
             "\\[NPC] Mort: Good luck.",
