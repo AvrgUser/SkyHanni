@@ -28,7 +28,7 @@ object LowHealthAlert {
      * REGEX-TEST: §e[T] §bShadow_Sphin §a22,595
      */
     @Suppress("MaxLineLength")
-    val teammatesPattern by dungeonSB.pattern(
+    val teammatesPattern by RepoPattern.pattern(
         "dungeon.low-health-alert.teammates",
         "(?:§.)*(?<classAbbv>\\[\\w]) (?:§.)*(?<username>\\w{2,16}) (?:(?:§.)*(?<classLevel>\\[Lvl?(?<level>[\\w,.]+)?]?)|§(?<color>.)(?:§.)*(?<health>[\\w,.]+)(?:§.)*.?)",
     )
