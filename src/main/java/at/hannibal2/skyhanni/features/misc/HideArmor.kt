@@ -35,7 +35,7 @@ object HideArmor {
     private fun onConfigFix(event: ConfigUpdaterMigrator.ConfigFixEvent) {
         event.move(91, "misc.hideArmor2", "misc.hideArmor")
         event.move(
-            147,
+            150,
             "misc.hideArmor.mode",
             "misc.hideArmor.playerSelection"
         ) { element ->
