@@ -12,11 +12,6 @@ class InvincibilityTimerConfig {
     @ConfigEditorBoolean
     @FeatureToggle
     var enabled = false
-
-    @Expose
-    @ConfigOption(name = "Show For Self", desc = "Do not show timer for mobs you spawned")
-    @ConfigEditorBoolean
-    var skipSelfOwned = true
     
     @Expose
     @ConfigOption(name = "Mob Types", desc = "Which mob types to apply this to")
