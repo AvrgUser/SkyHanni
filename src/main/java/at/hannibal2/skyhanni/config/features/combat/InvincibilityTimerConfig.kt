@@ -12,7 +12,7 @@ class InvincibilityTimerConfig {
     @ConfigEditorBoolean
     @FeatureToggle
     var enabled = false
-    
+
     @Expose
     @ConfigOption(name = "Mob Types", desc = "Which mob types to apply this to")
     @ConfigEditorDraggableList
