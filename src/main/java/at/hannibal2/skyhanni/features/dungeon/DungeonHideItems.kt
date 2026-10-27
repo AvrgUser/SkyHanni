@@ -83,7 +83,7 @@ object DungeonHideItems {
     /**
      * REGEX-TEST: Blessing of Time
      */
-    private val blessingPattern by patternGroup.pattern("blessing", "^Blessing of \w+[IVX ]*$")
+    private val blessingPattern by patternGroup.pattern("blessing", "^Blessing of \\w+[IVX ]*$")
 
     /**
      * REGEX-TEST: DAMAGE 30s
