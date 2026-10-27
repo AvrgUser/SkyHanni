@@ -547,7 +547,7 @@ abstract class AbstractRepoManager<E : AbstractRepoReloadEvent> {
 
     // TODO: Remove in 10.0.0
     private fun deleteLegacyFiles() {
-        SkyHanniMod.dataDir.resolve(repoFolderName).deleteRecursivelySafe()
+        // TODO: delete dataDir/repoFolderName
         val configDirectory = legacyConfigDirectory ?: return
         configDirectory.resolve("repo").deleteRecursivelySafe()
         configDirectory.resolve("currentCommit.json").delete()
