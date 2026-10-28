@@ -255,7 +255,7 @@ object ScrapGFS {
     private fun MutableList<Renderable>.addStaticSetButton(
         label: String,
         color: LorenzColor,
-        value: Int
+        value: Int,
     ) = Renderable.darkRectButton(
         Renderable.vertical(
             horizontalAlign = CENTER,
