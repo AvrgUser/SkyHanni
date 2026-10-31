@@ -1,16 +1,11 @@
 package at.hannibal2.skyhanni.config
 
 import at.hannibal2.skyhanni.api.event.HandleEvent
-import at.hannibal2.skyhanni.events.hypixel.HypixelJoinEvent
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
-import at.hannibal2.skyhanni.test.SkyHanniConfigSearchResetCommand
-import at.hannibal2.skyhanni.utils.ChatUtils
 import com.google.gson.JsonPrimitive
 
 @SkyHanniModule
 object UpdateKeybinds {
-
-    private val defaultedKeyBinds = mutableSetOf<String>()
 
     @HandleEvent
     private fun onConfigFix(event: ConfigUpdaterMigrator.ConfigFixEvent) {
@@ -21,26 +16,13 @@ object UpdateKeybinds {
             event.transform(150, keybindPath) { element ->
                 val oldCode = runCatching { element.asInt }.getOrNull()
                     ?: return@transform element
+
                 val newStringName = glfwKeyName(oldCode) ?: run {
-                    defaultedKeyBinds.add(keybindPath)
-                    val defaultValue = SkyHanniConfigSearchResetCommand.getDefaultValue("config.$keybindPath") as Int
-                    glfwKeyName(defaultValue) ?: glfwKeyName(-1)
+                    return@transform element
                 }
+
                 JsonPrimitive(newStringName)
             }
-        }
-    }
-
-    @HandleEvent
-    private fun onHypixelJoin(event: HypixelJoinEvent) {
-        if (defaultedKeyBinds.isNotEmpty()) {
-            ChatUtils.hoverableChat(
-                "Some Invalid Keybinds were reset to default values due to a migration from an older version of SkyHanni.\n" +
-                    "Please check your keybinds in the config and reconfigure them if necessary.",
-                hover = defaultedKeyBinds.toList(),
-                prefixColor = "§c",
-            )
-            defaultedKeyBinds.clear()
         }
     }
 
