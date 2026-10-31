@@ -19,7 +19,8 @@ object UpdateKeybinds {
         }
         for (keybindPath in SkyHanniConfigSearchResetCommand.allKeybinds) {
             event.transform(150, keybindPath) { element ->
-                val oldCode = element.asInt
+                val oldCode = runCatching { element.asInt }.getOrNull()
+                    ?: return@transform element
                 val newStringName = glfwKeyName(oldCode) ?: run {
                     defaultedKeyBinds.add(keybindPath)
                     val defaultValue = SkyHanniConfigSearchResetCommand.getDefaultValue("config.$keybindPath") as Int
