@@ -6,7 +6,44 @@ plugins {
     id("dev.kikugie.stonecutter")
 }
 
-val projectVersion = providers.fileContents(layout.projectDirectory.file("buildSrc/PROJECT_VERSION")).asText.map(String::trim)
+fun git(vararg arguments: String): String? = runCatching {
+    ProcessBuilder(listOf("git") + arguments)
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+        .apply { if (waitFor() != 0) return@runCatching null }
+        .inputStream.bufferedReader().readText().trim()
+}.getOrNull()?.takeIf(String::isNotBlank)
+
+fun commitCountAfter(anchor: String, ref: String): Int? =
+    git("rev-list", "--count", "$anchor..$ref")?.toIntOrNull()
+
+fun versionForBuild(): String {
+    val versionFile = rootProject.file("buildSrc/PROJECT_VERSION")
+    val baseVersion = versionFile.readText().trim().split('.')
+    require(baseVersion.size >= 2) { "PROJECT_VERSION must contain at least stable and beta components" }
+
+    val isPullRequest = true
+    val versionRef ="upstream/beta"
+    val versionFilePath = "buildSrc/PROJECT_VERSION"
+    val versionParts = if (isPullRequest) {
+        git("show", "$versionRef:$versionFilePath")?.split('.')
+            ?: error("Unable to read beta version from $versionRef")
+    } else baseVersion
+    val stable = versionParts.getOrNull(0)?.toIntOrNull()
+        ?: error("Invalid stable version in PROJECT_VERSION")
+    val beta = versionParts.getOrNull(1)?.toIntOrNull()
+        ?: error("Invalid beta version in PROJECT_VERSION")
+    val anchor = git("log", "-1", "--format=%H", versionRef, "--", versionFilePath)
+        ?: error("Unable to find the last beta version bump commit on $versionRef")
+    val commitsAfterBump = commitCountAfter(anchor, versionRef)
+        ?: error("Unable to count commits after the last beta version bump on $versionRef")
+    val bugfix = if (isPullRequest) commitsAfterBump + 1 else commitsAfterBump
+
+    return "$stable.$beta.$bugfix"
+}
+
+val projectVersion = providers.provider(::versionForBuild)
 
 allprojects {
     group = "at.hannibal2.skyhanni"
