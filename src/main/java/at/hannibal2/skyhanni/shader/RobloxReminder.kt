@@ -114,7 +114,7 @@ object RobloxReminder {
         )
     }
 
-    fun getWeedHack(): String {
+    fun getRat(): String {
         return """
   Woof   __             _,-"~^"-.
        _// )      _,-"~`         `.
@@ -128,8 +128,7 @@ object RobloxReminder {
      jgs ((("`             (((---~"`         //
                                             ((________________
                                             `----""~~~~~~^^^```
-    Powered by WeedHack | Version Meow
-
+    Powered by Meow
         """.trimIndent()
     }
 
@@ -139,9 +138,8 @@ object RobloxReminder {
         event.registerBrigadier("shrat") {
             description = "Rat"
             category = DEVELOPER_TEST
-            aliases = listOf("shweedhack")
             simpleCallback {
-                ChatUtils.chat(getWeedHack())
+                ChatUtils.chat(getRat())
             }
         }
     }
