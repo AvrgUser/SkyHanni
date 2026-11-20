@@ -4,78 +4,51 @@ import at.hannibal2.skyhanni.api.event.EventListeners.Listener
 import at.hannibal2.skyhanni.data.IslandType
 import at.hannibal2.skyhanni.utils.SkyBlockUtils
 
+/**
+ * All listeners of one event handler, sorted once by priority (stable, so registration order is kept within a priority).
+ * Per-island lists are only computed when a snapshot is rebuilt, see [EventHandler].
+ */
 class ListenerCollection(
     listeners: List<Listener>,
 ) {
 
-    private val buckets: Array<Array<Listener>?>
+    private val sorted: List<Listener> = listeners.sortedBy { it.priority }
 
-    init {
-        val sorted = listeners.sortedBy { it.priority }
-
-        val localBuckets = arrayOfNulls<MutableList<Listener>>(BUCKET_COUNT)
-
-        for (listener in sorted) {
-            for (index in listener.indices) {
-                val bucket = localBuckets[index]
-                if (bucket != null) {
-                    bucket += listener
-                } else {
-                    localBuckets[index] = mutableListOf(listener)
-                }
-            }
-        }
-
-        buckets = Array(BUCKET_COUNT) { index ->
-            localBuckets[index]?.toTypedArray()
-        }
-    }
-
-    fun current(): Array<Listener>? =
-        buckets.getOrNull(SkyHanniEvents.getCurrentStateIndex())
-
-    inline fun forEachCurrent(
-        action: (Listener) -> Boolean,
-    ) {
-        val listeners = current() ?: return
-
-        for (listener in listeners) {
-            if (!action(listener)) return
-        }
-    }
+    fun forState(state: Int): List<Listener> = sorted.filter { it.isActiveIn(state) }
 
     companion object {
 
         const val OUTSIDE = 0
 
         /**
-         * Offset applied to island ordinals because bucket 0
+         * Offset applied to island ordinals because state 0
          * is reserved for the outside-SkyBlock state.
          */
         private const val ISLAND_OFFSET = 1
-        private val BUCKET_COUNT = IslandType.entries.size + ISLAND_OFFSET
+        private val STATE_COUNT = IslandType.entries.size + ISLAND_OFFSET
 
         fun getCurrentStateIndex(): Int {
             if (!SkyBlockUtils.inSkyBlock) return OUTSIDE
             return SkyBlockUtils.currentIsland.ordinal + ISLAND_OFFSET
         }
 
-        fun createListenerIndices(options: HandleEvent): List<Int> {
+        /**
+         * One flag per state (outside SkyBlock, then every island), true if a listener with [options] is active there.
+         */
+        fun createStateMask(options: HandleEvent): BooleanArray {
+            val mask = BooleanArray(STATE_COUNT)
             val islands = getIslands(options)
-                .map { it.ordinal }
 
             if (islands.isEmpty()) {
-                return if (options.onlyOnSkyblock) {
-                    (ISLAND_OFFSET until BUCKET_COUNT).toList()
-                } else {
-                    (OUTSIDE until BUCKET_COUNT).toList()
-                }
+                val first = if (options.onlyOnSkyblock) ISLAND_OFFSET else OUTSIDE
+                for (state in first until STATE_COUNT) mask[state] = true
+            } else {
+                for (island in islands) mask[island.ordinal + ISLAND_OFFSET] = true
             }
-
-            return islands.map { it + ISLAND_OFFSET }
+            return mask
         }
 
-        private fun getIslands(options: HandleEvent): List<IslandType> {
+        private fun getIslands(options: HandleEvent): Set<IslandType> {
             val islandTypes = mutableSetOf<IslandType>()
 
             options.onlyOnIsland
@@ -86,7 +59,7 @@ class ListenerCollection(
 
             options.onlyOnIslandTypeTag.forEach { tag -> islandTypes += tag.getTypes() }
 
-            return islandTypes.toList()
+            return islandTypes
         }
     }
 }

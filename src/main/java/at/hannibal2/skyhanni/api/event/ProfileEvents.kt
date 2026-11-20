@@ -169,7 +169,7 @@ object ProfileEvents {
             literalCallback("dump") {
                 val file = dump()
                 ChatUtils.clickableLinkChat(
-                    "Event profiling dumped to file",
+                    "Event profiling dumped to ${file.fileName}",
                     url = file.toString(),
                     openPath = true,
                 )

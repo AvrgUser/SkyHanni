@@ -1,38 +1,37 @@
 package at.hannibal2.skyhanni.api.event
 
+import at.hannibal2.skyhanni.config.enums.OutsideSBFeature
 import at.hannibal2.skyhanni.utils.ReflectionUtils
 import at.hannibal2.skyhanni.utils.SkyBlockUtils
-import at.hannibal2.skyhanni.utils.collection.CollectionUtils.takeIfNotEmpty
 import java.lang.reflect.Method
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.function.Consumer
-
-typealias EventPredicate = (event: SkyHanniEvent) -> Boolean
 
 class EventListeners private constructor(val name: String, private val isGeneric: Boolean) {
 
-    private val listeners: MutableList<Listener> = mutableListOf()
+    private val listeners = CopyOnWriteArrayList<Listener>()
 
     constructor(event: Class<*>) : this(
         (event.name.split(".").lastOrNull() ?: event.name).replace("$", "."),
         GenericSkyHanniEvent::class.java.isAssignableFrom(event),
     )
 
-    fun removeListener(listener: Any) {
-        listeners.removeIf { it.invoker == listener }
+    fun removeListener(method: Method, instance: Any) {
+        listeners.removeIf { it.method == method && it.instance === instance }
     }
 
     fun addListener(method: Method, instance: Any, options: HandleEvent) {
         val name = buildListenerName(method)
-        val eventConsumer = when (method.parameterCount) {
-            0 -> createZeroParameterConsumer(method, instance)
-            1 -> createSingleParameterConsumer(method, instance)
+        val eventConsumer: Consumer<Any> = when (method.parameterCount) {
+            0 -> ReflectionUtils.createNoParameterConsumerFromMethod(instance, method)
+            1 -> ReflectionUtils.createConsumerFromMethod(instance, method)
             else -> throw IllegalArgumentException(
                 "Method ${method.name} must have either 0 or 1 parameters.",
             )
         }
         val generic = if (isGeneric) resolveGenericType(method) else null
 
-        listeners.add(Listener(name, eventConsumer, options, generic))
+        listeners.add(Listener(name, eventConsumer, options, generic, method = method, instance = instance))
     }
 
     private fun buildListenerName(method: Method): String {
@@ -47,16 +46,6 @@ class EventListeners private constructor(val name: String, private val isGeneric
         return "${method.declaringClass.name}.${method.name}$paramTypesString"
     }
 
-    private fun createZeroParameterConsumer(method: Method, instance: Any): (Any) -> Unit {
-        val runnable = ReflectionUtils.createRunnableFromMethod(instance, method)
-        return { _: Any -> runnable.run() }
-    }
-
-    private fun createSingleParameterConsumer(method: Method, instance: Any): (Any) -> Unit {
-        val consumer = ReflectionUtils.createConsumerFromMethod(instance, method)
-        return { event -> consumer.accept(event) }
-    }
-
     private fun resolveGenericType(method: Method): Class<*> =
         method.genericParameterTypes.getOrNull(0)?.let { genericType ->
             ReflectionUtils.resolveUpperBoundSuperClassGenericParameter(
@@ -68,55 +57,45 @@ class EventListeners private constructor(val name: String, private val isGeneric
             )
         } ?: error("Method ${method.name} does not have a generic parameter type.")
 
-    fun getListeners(): List<Listener> = listeners
+    fun getListeners(): List<Listener> = listeners.toList()
 
     class Listener(
         val name: String,
         val invoker: Consumer<Any>,
         options: HandleEvent,
-        private val generic: Class<*>?,
-        extraPredicates: List<EventPredicate> = listOf(),
+        val generic: Class<*>?,
+        val extraPredicates: List<(SkyHanniEvent) -> Boolean> = emptyList(),
+        val method: Method? = null,
+        val instance: Any? = null,
     ) {
         val priority: Int = options.priority
         val receiveCancelled: Boolean = options.receiveCancelled
-        val indices: List<Int> = ListenerCollection.createListenerIndices(options)
 
-        @Suppress("JoinDeclarationAndAssignment")
-        private val cachedPredicates: List<EventPredicate>
-        private var lastCacheGeneration = -1
-        private var cachedPredicateValue = false
+        private val states: BooleanArray = ListenerCollection.createStateMask(options)
+        private val features: Array<OutsideSBFeature> = options.onlyOnSkyblockOrFeatures
 
-        private val predicates: List<EventPredicate>
+        val needsEventCheck: Boolean = generic != null
 
-        fun shouldInvoke(event: SkyHanniEvent): Boolean {
-            val generation = SkyHanniEvents.getListenerCacheGeneration()
-            if (generation != lastCacheGeneration) {
-                cachedPredicateValue = cachedPredicates.all { it(event) }
-                lastCacheGeneration = generation
+        fun isActiveIn(state: Int): Boolean = state in states.indices && states[state]
+
+        /**
+         * Evaluated when the handler snapshot is rebuilt
+         */
+        fun passesStaticChecks(): Boolean {
+            if (SkyHanniEvents.isDisabledInvoker(name)) return false
+            if (features.isNotEmpty()) {
+                @Suppress("DEPRECATION")
+                if (!SkyBlockUtils.inSkyBlock && features.none { it.isSelected() }) return false
             }
-            return cachedPredicateValue && predicates.all { it(event) }
+            return true
         }
 
-        init {
-            cachedPredicates = buildList {
-                options.onlyOnSkyblockOrFeatures.takeIfNotEmpty()?.let { features ->
-                    @Suppress("DEPRECATION")
-                    add { _ -> SkyBlockUtils.inSkyBlock || features.any { it.isSelected() } }
-                }
-                add { _ -> !SkyHanniEvents.isDisabledInvoker(name) }
+        /** Checks that need the posted event. Only called if [needsEventCheck]. */
+        fun matches(event: SkyHanniEvent): Boolean {
+            if (generic != null && !(event is GenericSkyHanniEvent<*> && generic.isAssignableFrom(event.type))) {
+                return false
             }
-            // These predicates can't be cached since they depend on info about the actual event
-            predicates = buildList {
-                if (!receiveCancelled) add { event -> !event.isCancelled }
-
-                if (generic != null) {
-                    add { event ->
-                        event is GenericSkyHanniEvent<*> && generic.isAssignableFrom(event.type)
-                    }
-                }
-                // Makes it possible to be able to add more predicates from other sources, such as other annotations
-                addAll(extraPredicates)
-            }
+            return true
         }
     }
 }

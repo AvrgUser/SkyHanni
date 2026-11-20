@@ -14,30 +14,53 @@ class EventHandler<T : SkyHanniEvent> private constructor(
     val name: String,
     private val listenerCollection: ListenerCollection,
     private val canReceiveCancelled: Boolean,
+    private val predicates: List<(T) -> Boolean>,
 ) {
-
-    val invokeLog = SkyHanniEvents.EventInvokeLog()
 
     constructor(event: Class<T>, listeners: List<Listener>) : this(
         (event.name.split(".").lastOrNull() ?: event.name).replace("$", "."),
         ListenerCollection(listeners),
-        listeners.any { it.receiveCancelled },
+        getPredicates(event, listeners),
     )
 
+    private class Snapshot(val generation: Int, val listeners: Array<Listener>)
+
+
+    @Volatile
+    private var snapshot = Snapshot(-1, NO_LISTENERS)
+
+    private fun currentSnapshot(): Snapshot {
+        val generation = SkyHanniEvents.getListenerCacheGeneration()
+        val current = snapshot
+        if (current.generation == generation) return current
+
+        val state = SkyHanniEvents.getCurrentStateIndex()
+
+        // Rare path: island change, repo reload, feature toggle, first post.
+        val listeners = if (SkyHanniEvents.isDisabledHandler(name)) {
+            NO_LISTENERS
+        } else {
+            listenerCollection.forState(state)
+                .filter { it.passesStaticChecks() }
+                .toTypedArray()
+        }
+        return Snapshot(generation, listeners).also { snapshot = it }
+    }
+
     fun post(event: T, onError: ((Throwable) -> Unit)? = null) {
-        invokeLog.invokeCount++
-        if (SkyHanniEvents.isDisabledHandler(name)) return
+        val listeners = currentSnapshot().listeners
+        if (listeners.isEmpty()) return
 
         var errors = 0
-        listenerCollection.forEachCurrent { listener ->
-            if (!listener.shouldInvoke(event)) return@forEachCurrent true
+        for (listener in listeners) {
+            if (listener.needsEventCheck && !listener.matches(event)) continue
 
             try {
                 listener.invoker.accept(event)
             } catch (originalThrowable: Throwable) {
                 val throwable = originalThrowable.maybeSkipError()
                 errors++
-                if (errors <= 3) {
+                if (errors <= MAX_SHOWN_ERRORS) {
                     val errorName = throwable::class.simpleName ?: "error"
                     val aOrAn = StringUtils.optionalAn(errorName)
                     val message = "Caught $aOrAn $errorName in ${listener.name} at $name: ${throwable.message}"
@@ -45,18 +68,31 @@ class EventHandler<T : SkyHanniEvent> private constructor(
                 }
                 onError?.invoke(throwable)
             }
-
-            !event.isCancelled || canReceiveCancelled
         }
 
-        if (errors > 3) {
-            val hiddenErrors = errors - 3
+        if (errors > MAX_SHOWN_ERRORS) {
+            val hiddenErrors = errors - MAX_SHOWN_ERRORS
             ChatUtils.chat(
                 componentBuilder {
                     append("[SkyHanni/${SkyHanniMod.VERSION}] $hiddenErrors more errors in $name are hidden!")
                     withColor(ChatFormatting.RED)
-                }
+                },
             )
+        }
+    }
+
+    private companion object {
+        const val MAX_SHOWN_ERRORS = 3
+        val NO_LISTENERS = emptyArray<Listener>()
+
+
+        private fun <T: SkyHanniEvent> getPredicates(event: Class<T>, listeners: List<Listener>): List<(T) -> Boolean> = buildList {
+            if (listeners.any { it.receiveCancelled }) {
+                add { event -> event.isCancelled }
+            }
+            if (GenericSkyHanniEvent::class.java.isAssignableFrom(event)) {
+                add { event -> (event as GenericSkyHanniEvent<*>).type }
+            }
         }
     }
 }

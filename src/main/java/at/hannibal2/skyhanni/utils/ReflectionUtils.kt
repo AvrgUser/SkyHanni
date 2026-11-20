@@ -138,6 +138,10 @@ object ReflectionUtils {
         throw IllegalArgumentException(illegalMessage, e)
     }
 
+    /**
+     * Creates a [Consumer] that calls [method] on [instance] directly, through a single generated class
+     * with no extra wrapper in between. Use this result as is: wrapping it again adds a megamorphic call.
+     */
     fun createConsumerFromMethod(instance: Any, method: Method): Consumer<Any> {
         require(method.parameterTypes.isNotEmpty()) {
             "Method ${instance.javaClass.name}#${method.name} has no parameters, cannot be a Consumer"
@@ -158,6 +162,15 @@ object ReflectionUtils {
         MethodType.methodType(Nothing::class.javaPrimitiveType),
         MethodType.methodType(Nothing::class.javaPrimitiveType),
     )
+
+    /**
+     * Creates a [Consumer] that ignores its argument and calls the parameterless [method] on [instance].
+     * LambdaMetafactory cannot drop an argument, so this is exactly one wrapper around the generated [Runnable].
+     */
+    fun createNoParameterConsumerFromMethod(instance: Any, method: Method): Consumer<Any> {
+        val runnable = createRunnableFromMethod(instance, method)
+        return Consumer { runnable.run() }
+    }
 
     inline fun <reified Stop : Any, reified T> Any.findGenericSuperclassTypeArgument(index: Int = 0): Class<T> {
         var type = javaClass.genericSuperclass

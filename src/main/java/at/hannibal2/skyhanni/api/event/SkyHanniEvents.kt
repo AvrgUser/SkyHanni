@@ -1,26 +1,28 @@
 package at.hannibal2.skyhanni.api.event
 
 import at.hannibal2.skyhanni.SkyHanniMod
-import at.hannibal2.skyhanni.api.minecraftevents.ClientEvents
 import at.hannibal2.skyhanni.data.jsonobjects.repo.DisabledEventVersionedJson
 import at.hannibal2.skyhanni.data.jsonobjects.repo.DisabledEventsJson
-import at.hannibal2.skyhanni.events.DebugDataCollectEvent
 import at.hannibal2.skyhanni.events.RepositoryReloadEvent
-import at.hannibal2.skyhanni.events.SecondPassedEvent
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
 import at.hannibal2.skyhanni.test.command.ErrorManager
-import at.hannibal2.skyhanni.utils.NumberUtil.addSeparators
-import at.hannibal2.skyhanni.utils.collection.CollectionUtils.removeIfKey
 import at.hannibal2.skyhanni.utils.system.ModVersion
 import at.hannibal2.skyhanni.utils.system.PlatformUtils
 import java.lang.reflect.Method
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 @SkyHanniModule
 object SkyHanniEvents {
-    private val listeners: MutableMap<Class<out SkyHanniEvent>, EventListeners> = mutableMapOf()
-    private val handlers: MutableMap<Class<out SkyHanniEvent>, EventHandler<out SkyHanniEvent>> = mutableMapOf()
+    // Mutex for Writes (register, unregister, handler creation)
+    private val lock = Any()
+    private val listeners: MutableMap<Class<out SkyHanniEvent>, EventListeners> = ConcurrentHashMap()
+    private val handlers: MutableMap<Class<out SkyHanniEvent>, EventHandler<out SkyHanniEvent>> = ConcurrentHashMap()
+
+    @Volatile
     private var disabledHandlers = emptySet<String>()
+
+    @Volatile
     private var disabledHandlerInvokers = emptySet<String>()
 
     fun init(instances: List<Any>) = instances.forEach(::register)
@@ -31,24 +33,34 @@ object SkyHanniEvents {
         }
     }
 
-    fun unregister(instance: Any) = instance.javaClass.declaredMethods.forEach(::unregisterMethod)
+    fun unregister(instance: Any) = instance.javaClass.declaredMethods.forEach { unregisterMethod(it, instance) }
 
     @Suppress("UNCHECKED_CAST")
-    fun <T : SkyHanniEvent> getEventHandler(event: Class<T>): EventHandler<T> = handlers.getOrPut(event) {
-        EventHandler(
-            event,
-            getEventClasses(event).mapNotNull { listeners[it] }.flatMap(EventListeners::getListeners),
-        )
-    } as EventHandler<T>
+    fun <T : SkyHanniEvent> getEventHandler(event: Class<T>): EventHandler<T> {
+        // Hot path: one lock-free map read.
+        handlers[event]?.let { return it as EventHandler<T> }
+
+        return synchronized(lock) {
+            handlers.getOrPut(event) {
+                EventHandler(
+                    event,
+                    getEventClasses(event).mapNotNull { listeners[it] }.flatMap(EventListeners::getListeners),
+                )
+            } as EventHandler<T>
+        }
+    }
 
     fun isDisabledHandler(handler: String): Boolean = handler in disabledHandlers
     fun isDisabledInvoker(invoker: String): Boolean = invoker in disabledHandlerInvokers
 
     private fun registerMethod(method: Method, instance: Any) {
         val (options, eventTypes) = getEventData(method) ?: return
-        eventTypes.forEach { eventType ->
-            listeners.getOrPut(eventType) { EventListeners(eventType) }
-                .addListener(method, instance, options)
+        synchronized(lock) {
+            eventTypes.forEach { eventType ->
+                listeners.getOrPut(eventType) { EventListeners(eventType) }
+                    .addListener(method, instance, options)
+                invalidateHandlers(eventType)
+            }
         }
     }
 
@@ -121,16 +133,22 @@ object SkyHanniEvents {
         }
     }
 
-    private fun unregisterMethod(method: Method) {
+    private fun unregisterMethod(method: Method, instance: Any) {
         val (_, eventTypes) = getEventData(method) ?: return
-        eventTypes.forEach { event ->
-            unregisterHandler(event)
-            listeners.values.forEach { it.removeListener(method) }
+        synchronized(lock) {
+            eventTypes.forEach { event ->
+                listeners[event]?.removeListener(method, instance)
+                invalidateHandlers(event)
+            }
         }
     }
 
-    private fun unregisterHandler(clazz: Class<out SkyHanniEvent>) {
-        handlers.removeIfKey { it.isAssignableFrom(clazz) }
+    /**
+     * A handler also contains the listeners of the superclasses of its event, so every handler whose event is
+     * [clazz] or a subclass of it has to be rebuilt. They are recreated lazily on the next post.
+     */
+    private fun invalidateHandlers(clazz: Class<out SkyHanniEvent>) {
+        handlers.keys.removeIf { clazz.isAssignableFrom(it) }
     }
 
     private val listenerCacheGeneration = AtomicInteger(0)
@@ -188,71 +206,6 @@ object SkyHanniEvents {
         }.map { it.name }.toSet()
 
     val seconds = listOf(10, 60, 60 * 5)
-
-    @HandleEvent
-    private fun onSecondPassed(event: SecondPassedEvent) {
-        try {
-            val list = handlers.values.toMutableList()
-
-            for (second in seconds) {
-                if (event.repeatSeconds(second)) {
-                    for (handler in list) {
-                        val log = handler.invokeLog
-                        val current = log.invokeCount
-
-                        val storage = log.overTimeLog[second]
-                        if (storage == null) {
-                            log.overTimeLog[second] = EventInvokeData(current, 0)
-                        } else {
-                            storage.diff = current - storage.oldValue
-                            storage.oldValue = current
-                        }
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            // ignore this error on 1.21 for now
-        }
-    }
-
-    class EventInvokeData(var oldValue: Long, var diff: Long)
-
-    class EventInvokeLog {
-        var invokeCount: Long = 0L
-
-        var overTimeLog = mutableMapOf<Int, EventInvokeData>()
-    }
-
-    @HandleEvent
-    private fun onDebugDataCollect(event: DebugDataCollectEvent) {
-        event.title("Events")
-        event.addIrrelevant {
-            add("- <event name> (<total invoke count> invokes per second: <last 10s, 60s, 5m, total>)")
-            handlers.values
-                .filter { it.invokeLog.invokeCount > 0 }
-                .sortedWith(compareBy({ -it.invokeLog.invokeCount }, { it.name }))
-                .forEach {
-                    val log = it.invokeLog
-
-                    add(
-                        buildString {
-                            append("- ${it.name} ")
-                            append(log.invokeCount.addSeparators())
-
-                            for (second in seconds) {
-                                val totalDiff = log.overTimeLog[second]?.diff ?: 0
-                                val perSecond = totalDiff / second
-                                append(" ")
-                                append("${perSecond.addSeparators()}/s")
-                            }
-
-                            append(" ")
-                            append("${(log.invokeCount / (ClientEvents.totalTicks / 20)).addSeparators()}/s")
-                        },
-                    )
-                }
-        }
-    }
 
     /**
      * Returns a list of all super classes and the class itself up to [SkyHanniEvent].
