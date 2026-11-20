@@ -9,15 +9,14 @@ import at.hannibal2.skyhanni.test.command.ErrorManager
 import at.hannibal2.skyhanni.utils.system.ModVersion
 import at.hannibal2.skyhanni.utils.system.PlatformUtils
 import java.lang.reflect.Method
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 @SkyHanniModule
 object SkyHanniEvents {
     // Mutex for Writes (register, unregister, handler creation)
     private val lock = Any()
-    private val listeners: MutableMap<Class<out SkyHanniEvent>, EventListeners> = ConcurrentHashMap()
-    private val handlers: MutableMap<Class<out SkyHanniEvent>, EventHandler<out SkyHanniEvent>> = ConcurrentHashMap()
+    private val listeners: MutableMap<Class<out SkyHanniEvent>, EventListeners> = mutableMapOf()
+    private val handlers: MutableMap<Class<out SkyHanniEvent>, EventHandler<out SkyHanniEvent>> = mutableMapOf()
 
     @Volatile
     private var disabledHandlers = emptySet<String>()
