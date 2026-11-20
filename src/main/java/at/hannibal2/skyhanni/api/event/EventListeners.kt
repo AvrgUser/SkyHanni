@@ -4,14 +4,13 @@ import at.hannibal2.skyhanni.config.enums.OutsideSBFeature
 import at.hannibal2.skyhanni.utils.ReflectionUtils
 import at.hannibal2.skyhanni.utils.SkyBlockUtils
 import java.lang.reflect.Method
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.function.Consumer
 
 typealias EventPredicate = (event: SkyHanniEvent) -> Boolean
 
 class EventListeners private constructor(val name: String, private val isGeneric: Boolean) {
 
-    private val listeners = CopyOnWriteArrayList<Listener>()
+    private val listeners: MutableList<Listener> = mutableListOf()
 
     constructor(event: Class<*>) : this(
         (event.name.split(".").lastOrNull() ?: event.name).replace("$", "."),
