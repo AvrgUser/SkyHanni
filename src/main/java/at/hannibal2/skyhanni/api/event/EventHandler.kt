@@ -2,6 +2,8 @@ package at.hannibal2.skyhanni.api.event
 
 import at.hannibal2.skyhanni.SkyHanniMod
 import at.hannibal2.skyhanni.api.event.EventListeners.Listener
+import at.hannibal2.skyhanni.api.event.kinds.EventKind
+import at.hannibal2.skyhanni.api.event.kinds.EventKinds
 import at.hannibal2.skyhanni.test.command.ErrorManager
 import at.hannibal2.skyhanni.test.command.ErrorManager.maybeSkipError
 import at.hannibal2.skyhanni.utils.ChatUtils
@@ -13,48 +15,81 @@ import net.minecraft.ChatFormatting
 class EventHandler<T : SkyHanniEvent> private constructor(
     val name: String,
     private val listenerCollection: ListenerCollection,
-    private val canReceiveCancelled: Boolean,
-    private val predicates: List<(T) -> Boolean>,
+    private val kinds: List<EventKind>,
 ) {
 
     constructor(event: Class<T>, listeners: List<Listener>) : this(
         (event.name.split(".").lastOrNull() ?: event.name).replace("$", "."),
         ListenerCollection(listeners),
-        getPredicates(event, listeners),
+        EventKinds.all.filter { it.appliesTo(event) },
     )
 
-    private class Snapshot(val generation: Int, val listeners: Array<Listener>)
+    /**
+     * A listener together with every check of this handler that looks at the event
+     */
+    private class Entry(val listener: Listener, val predicates: Array<EventPredicate>) {
+        fun accepts(event: SkyHanniEvent): Boolean {
+            for (predicate in predicates) {
+                if (!predicate(event)) return false
+            }
+            return true
+        }
+    }
 
+    private class Snapshot(
+        val generation: Int = -1,
+        val entries: Array<Entry> = NO_ENTRIES,
+        val stopWhen: EventPredicate? = null,
+    )
 
     @Volatile
-    private var snapshot = Snapshot(-1, NO_LISTENERS)
+    private var snapshot = Snapshot()
 
     private fun currentSnapshot(): Snapshot {
         val generation = SkyHanniEvents.getListenerCacheGeneration()
         val current = snapshot
         if (current.generation == generation) return current
-
         val state = SkyHanniEvents.getCurrentStateIndex()
 
         // Rare path: island change, repo reload, feature toggle, first post.
-        val listeners = if (SkyHanniEvents.isDisabledHandler(name)) {
-            NO_LISTENERS
-        } else {
-            listenerCollection.forState(state)
-                .filter { it.passesStaticChecks() }
-                .toTypedArray()
+        return buildSnapshot(generation, state).also { snapshot = it }
+    }
+
+    private fun buildSnapshot(generation: Int, state: Int): Snapshot {
+        if (SkyHanniEvents.isDisabledHandler(name)) return Snapshot(generation, NO_ENTRIES, null)
+
+        val active = listenerCollection.forState(state).filter { it.passesStaticChecks() }
+        val plans = kinds.map { it.plan(active) }
+
+        val entries = Array(active.size) { index ->
+            val listener = active[index]
+            val predicates = buildList {
+                for (plan in plans) plan.listenerFilter?.invoke(listener)?.let(::add)
+            }
+            Entry(listener, predicates.toTypedArray())
         }
-        return Snapshot(generation, listeners).also { snapshot = it }
+        return Snapshot(generation, entries, mergeStops(plans.mapNotNull { it.stopWhen }))
+    }
+
+    private fun mergeStops(stops: List<EventPredicate>): EventPredicate? = when (stops.size) {
+        0 -> null
+        1 -> stops[0]
+        else -> { event -> stops.any { it(event) } }
     }
 
     fun post(event: T, onError: ((Throwable) -> Unit)? = null) {
-        val listeners = currentSnapshot().listeners
-        if (listeners.isEmpty()) return
+        val snapshot = currentSnapshot()
+        val entries = snapshot.entries
+        if (entries.isEmpty()) return
+
+        val stopWhen = snapshot.stopWhen
+        if (stopWhen != null && stopWhen(event)) return
 
         var errors = 0
-        for (listener in listeners) {
-            if (listener.needsEventCheck && !listener.matches(event)) continue
+        for (entry in entries) {
+            if (!entry.accepts(event)) continue
 
+            val listener = entry.listener
             try {
                 listener.invoker.accept(event)
             } catch (originalThrowable: Throwable) {
@@ -68,6 +103,8 @@ class EventHandler<T : SkyHanniEvent> private constructor(
                 }
                 onError?.invoke(throwable)
             }
+
+            if (stopWhen != null && stopWhen(event)) break
         }
 
         if (errors > MAX_SHOWN_ERRORS) {
@@ -83,16 +120,6 @@ class EventHandler<T : SkyHanniEvent> private constructor(
 
     private companion object {
         const val MAX_SHOWN_ERRORS = 3
-        val NO_LISTENERS = emptyArray<Listener>()
-
-
-        private fun <T: SkyHanniEvent> getPredicates(event: Class<T>, listeners: List<Listener>): List<(T) -> Boolean> = buildList {
-            if (listeners.any { it.receiveCancelled }) {
-                add { event -> event.isCancelled }
-            }
-            if (GenericSkyHanniEvent::class.java.isAssignableFrom(event)) {
-                add { event -> (event as GenericSkyHanniEvent<*>).type }
-            }
-        }
+        val NO_ENTRIES = emptyArray<Entry>()
     }
 }

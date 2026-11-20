@@ -7,6 +7,8 @@ import java.lang.reflect.Method
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.function.Consumer
 
+typealias EventPredicate = (event: SkyHanniEvent) -> Boolean
+
 class EventListeners private constructor(val name: String, private val isGeneric: Boolean) {
 
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -64,7 +66,7 @@ class EventListeners private constructor(val name: String, private val isGeneric
         val invoker: Consumer<Any>,
         options: HandleEvent,
         val generic: Class<*>?,
-        val extraPredicates: List<(SkyHanniEvent) -> Boolean> = emptyList(),
+        /** The handler method and its owner, used to find this listener again when unregistering. */
         val method: Method? = null,
         val instance: Any? = null,
     ) {
@@ -74,26 +76,17 @@ class EventListeners private constructor(val name: String, private val isGeneric
         private val states: BooleanArray = ListenerCollection.createStateMask(options)
         private val features: Array<OutsideSBFeature> = options.onlyOnSkyblockOrFeatures
 
-        val needsEventCheck: Boolean = generic != null
-
         fun isActiveIn(state: Int): Boolean = state in states.indices && states[state]
 
         /**
-         * Evaluated when the handler snapshot is rebuilt
+         * Checks that never look at the event. Evaluated when the handler snapshot is rebuilt
+         * (island change, repo reload, feature toggle), not on every post.
          */
         fun passesStaticChecks(): Boolean {
             if (SkyHanniEvents.isDisabledInvoker(name)) return false
             if (features.isNotEmpty()) {
                 @Suppress("DEPRECATION")
                 if (!SkyBlockUtils.inSkyBlock && features.none { it.isSelected() }) return false
-            }
-            return true
-        }
-
-        /** Checks that need the posted event. Only called if [needsEventCheck]. */
-        fun matches(event: SkyHanniEvent): Boolean {
-            if (generic != null && !(event is GenericSkyHanniEvent<*> && generic.isAssignableFrom(event.type))) {
-                return false
             }
             return true
         }
