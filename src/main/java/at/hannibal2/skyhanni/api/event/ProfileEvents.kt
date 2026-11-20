@@ -143,7 +143,7 @@ object ProfileEvents {
                     val mean = if (count == 0L) 0.0 else s.totalNanos.sum() / count / 1000.0
                     add(
                         "- ${nameOf(eventClass)} $count %.1f %.1f %.1f"
-                            .format(mean, s.percentile(0.99) / 1000.0, s.maxNanos.get() / 1000.0)
+                            .format(mean, s.percentile(0.99) / 1000.0, s.maxNanos.get() / 1000.0),
                     )
                 }
         }
