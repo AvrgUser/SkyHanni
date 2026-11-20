@@ -218,6 +218,14 @@ var Component.url: String?
         this.copyIfNeeded().withStyle { (it.withClickEvent(ClickEvent.OpenUrl(URI.create(value.orEmpty())))) }
     }
 
+var Component.path: String?
+    get() = this.style.clickEvent?.takeIf {
+        it.action() == ClickEvent.Action.OPEN_FILE
+    }?.let { (it as ClickEvent.OpenFile).path }
+    set(value) {
+        this.copyIfNeeded().withStyle { (it.withClickEvent(ClickEvent.OpenFile(value.orEmpty()))) }
+    }
+
 var MutableComponent.underlined: Boolean
     get() = this.style.isUnderlined
     set(value) {

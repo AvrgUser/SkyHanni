@@ -21,6 +21,7 @@ import at.hannibal2.skyhanni.utils.compat.command
 import at.hannibal2.skyhanni.utils.compat.componentBuilder
 import at.hannibal2.skyhanni.utils.compat.formattedTextCompat
 import at.hannibal2.skyhanni.utils.compat.hover
+import at.hannibal2.skyhanni.utils.compat.path
 import at.hannibal2.skyhanni.utils.compat.url
 import at.hannibal2.skyhanni.utils.compat.withColor
 import net.minecraft.ChatFormatting
@@ -318,6 +319,7 @@ object ChatUtils {
         prefix: Boolean = true,
         prefixColor: String? = null,
         replaceSameMessage: Boolean = false,
+        openPath: Boolean = false,
     ) {
         var color: Int? = null
         if (prefixColor != null) {
@@ -330,7 +332,11 @@ object ChatUtils {
                 if (color == null) withColor(ChatFormatting.YELLOW)
                 else withColor(color)
             }
-            this.url = url
+            if (openPath) {
+                this.path = url
+            } else {
+                this.url = url
+            }
             this.hover = hover.asComponent {
                 if (color != null) withColor(color)
                 else withColor(ChatFormatting.YELLOW)

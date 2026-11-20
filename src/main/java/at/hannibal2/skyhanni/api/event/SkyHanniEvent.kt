@@ -17,7 +17,14 @@ abstract class SkyHanniEvent protected constructor() {
 
     private fun prePost(onError: ((Throwable) -> Unit)?): SkyHanniEvent = apply {
         (this as? Rendering)?.let { DrawContextUtils.setContext(it.context) }
-        SkyHanniEvents.getEventHandler(javaClass).post(this, onError)
+        val handler = SkyHanniEvents.getEventHandler(javaClass)
+        if (ProfileEvents.enabled) {
+            val start = System.nanoTime()
+            handler.post(this, onError)
+            ProfileEvents.record(javaClass, System.nanoTime() - start)
+        } else {
+            handler.post(this, onError)
+        }
         if (this is Rendering) DrawContextUtils.clearContext()
     }
 
