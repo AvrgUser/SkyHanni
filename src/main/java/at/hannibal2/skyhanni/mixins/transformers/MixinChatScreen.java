@@ -1,6 +1,5 @@
 package at.hannibal2.skyhanni.mixins.transformers;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import at.hannibal2.skyhanni.features.chat.CopyChat;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -13,8 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MixinChatScreen {
 
     @Inject(method = "mouseClicked", at = @At("HEAD"))
-    public void mouseClicked(MouseButtonEvent click, boolean doubled, CallbackInfoReturnable<Boolean> cir) {
-       if (click.button() != InputConstants.MOUSE_BUTTON_RIGHT) return;
-       CopyChat.handleCopyChat((int) click.x(), (int) click.y());
+    public void mouseClicked(MouseButtonEvent event, boolean doubled, CallbackInfoReturnable<Boolean> cir) {
+       CopyChat.handleCopyChat(event);
     }
 }

@@ -1,35 +1,45 @@
 package at.hannibal2.skyhanni.features.chat
 
 import at.hannibal2.skyhanni.SkyHanniMod
+import at.hannibal2.skyhanni.api.event.HandleEvent
+import at.hannibal2.skyhanni.config.ConfigUpdaterMigrator
 import at.hannibal2.skyhanni.features.misc.visualwords.ModifyVisualWords
+import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
 import at.hannibal2.skyhanni.test.command.ErrorManager
 import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.ClipboardUtils
+import at.hannibal2.skyhanni.utils.InputKeys
 import at.hannibal2.skyhanni.utils.KeyboardManager
 import at.hannibal2.skyhanni.utils.StringUtils.removeColor
 import at.hannibal2.skyhanni.utils.StringUtils.stripHypixelMessage
 import at.hannibal2.skyhanni.utils.compat.MinecraftCompat
 import at.hannibal2.skyhanni.utils.compat.OrderedTextUtils
 import at.hannibal2.skyhanni.utils.compat.formattedTextCompat
+import com.google.gson.JsonObject
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.ActiveTextCollector
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.TextAlignment
 import net.minecraft.client.gui.components.ChatComponent
+import net.minecraft.client.input.KeyEvent
+import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.multiplayer.chat.GuiMessage
 import net.minecraft.client.renderer.state.gui.GuiTextRenderState
 import net.minecraft.network.chat.Component
 import net.minecraft.util.FormattedCharSequence
 import org.joml.Matrix3x2f
 
+@SkyHanniModule
 object CopyChat {
     private val config get() = SkyHanniMod.feature.chat.copyChat
 
     @JvmStatic
-    fun handleCopyChat(mouseX: Int, mouseY: Int) {
+    fun handleCopyChat(event: MouseButtonEvent) {
         try {
-            if (!config) return
-            processCopyChat(mouseX, mouseY)
+            if (!config.enabled) return
+            val key = InputKeys.mouse(event.button())
+            if (key != config.keybind) return
+            processCopyChat(event.x().toInt(), event.y().toInt())
         } catch (e: Exception) {
             ErrorManager.logErrorWithData(e, "Error while copying chat line")
         }
@@ -119,6 +129,16 @@ object CopyChat {
             parameters: ActiveTextCollector.Parameters,
         ) {
             defaultScrollingHelper(message, centerX, left, right, top, bottom, font.width(message), 9, parameters)
+        }
+    }
+
+    @HandleEvent
+    private fun onConfigFix(event: ConfigUpdaterMigrator.ConfigFixEvent) {
+        event.transform(151, "chat.copyChat") { element ->
+            JsonObject().apply {
+                addProperty("enabled", element.asBoolean)
+                addProperty("keybind", InputKeys.MOUSE_BUTTON_RIGHT.name)
+            }
         }
     }
 }
