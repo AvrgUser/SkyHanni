@@ -148,7 +148,9 @@ object ForagingTracker : SkyHanniBucketedItemTracker<ForagingTrackerLegacy.TreeT
         }
     }.values.forEach { (treeType, delta, deltaEnchanted) ->
         val baseLog = treeType.getBaseLog()
-        if (delta > 0) addItem(treeType, baseLog, delta, command = false)
+        val compactedBaseLogs = deltaEnchanted * 160
+        val baseLogDelta = if (delta >= compactedBaseLogs) delta - compactedBaseLogs else delta
+        if (baseLogDelta > 0) addItem(treeType, baseLog, baseLogDelta, command = false)
 
         val enchantedLog = treeType.getEnchantedLog()
         if (deltaEnchanted > 0) addItem(treeType, enchantedLog, deltaEnchanted, command = false)
