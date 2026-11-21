@@ -1,9 +1,7 @@
 pluginManagement {
     includeBuild("sharedVariables")
     repositories {
-        mavenCentral()
         mavenLocal()
-        gradlePluginPortal()
         maven("https://maven.fabricmc.net") {
             content {
                 includeGroupAndSubgroups("net.fabricmc")
@@ -30,6 +28,8 @@ pluginManagement {
                 includeGroupAndSubgroups("dev.kikugie")
             }
         }
+        gradlePluginPortal()
+        mavenCentral()
     }
     resolutionStrategy.eachPlugin {
         requested.apply {

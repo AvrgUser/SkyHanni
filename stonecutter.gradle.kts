@@ -20,7 +20,6 @@ allprojects {
     version = projectVersion.get()
 
     repositories {
-        mavenCentral()
         mavenLocal()
 
         // Fabric
@@ -105,6 +104,7 @@ allprojects {
             }
         }
 
+        // RenderChest for entity outline
         exclusiveContent {
             forRepositories(
                 repositories.maven("https://maven.azureaaron.net/releases"),
@@ -113,6 +113,8 @@ allprojects {
                 includeGroupAndSubgroups("net.azureaaron")
             }
         }
+
+        mavenCentral()
     }
 }
 
